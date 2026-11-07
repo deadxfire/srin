@@ -569,15 +569,15 @@ public function index(): string
 }
 
 // In your .srin.php template:
-@@foreach(\$articles as \$article)
+[each \$articles as \$article]
     &lt;article class="article-card"&gt;
         &lt;h2&gt;@{{ \$article-&gt;title }}&lt;/h2&gt;
         &lt;p&gt;@{{ \$article-&gt;summary }}&lt;/p&gt;
     &lt;/article&gt;
-@@endforeach
+[end]
 
 &lt;!-- Render responsive pagination controls (prev, numbered pills, next): --&gt;
-@@paginate(\$articles)
+[paginate \$articles]
 &lt;!-- Or render raw links: --&gt;
 @{!! \$articles-&gt;links() !!}</code></pre>
 
@@ -1078,22 +1078,22 @@ class ArticleController extends BaseController
 
                         <h3>Secure Form Directives:</h3>
                         <pre><code>&lt;form action="@{{route('contact.send')}}" method="POST"&gt;
-    @@csrf       &lt;!-- Injects CSRF token protection --&gt;
-    @@honeypot   &lt;!-- Injects invisible bot trap to block spam bots --&gt;
+    [csrf]       &lt;!-- Injects CSRF token protection --&gt;
+    [honeypot]   &lt;!-- Injects invisible bot trap to block spam bots --&gt;
 
     &lt;input type="text" name="name" value="@{{ old('name') }}" required&gt;
     &lt;input type="email" name="email" value="@{{ old('email') }}" required&gt;
     &lt;button type="submit"&gt;Send Message&lt;/button&gt;
 &lt;/form&gt;</code></pre>
 
-                        <h3>Control Flow Directives:</h3>
-                        <pre><code>@@if(count(\$projects) &gt; 0)
-    @@foreach(\$projects as \$project)
+                        <h3>Control Flow Directives (Clean Srin Tags):</h3>
+                        <pre><code>[if count(\$projects) &gt; 0]
+    [each \$projects as \$project]
         &lt;div class="card"&gt;@{{ \$project['title'] }}&lt;/div&gt;
-    @@endforeach
-@@else
+    [end]
+[else]
     &lt;p&gt;No projects found.&lt;/p&gt;
-@@endif</code></pre>
+[end]</code></pre>
 
                         <h3>Master Layout with Named Slots: <code>@@content('name')</code></h3>
                         <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>@@content('slot_name')</code> alongside the primary <code>@@content</code>:</p>
@@ -1287,41 +1287,46 @@ class ArticleController extends BaseController
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
-                                        <td colspan="3">5. Template Control Flow Directives</td>
+                                        <td colspan="3">5. Template Control Flow Directives (Srin Tags)</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@if / @@elseif / @@else</code></td>
-                                        <td><code>@@if(\$count &gt; 0) ... @@else ... @@endif</code></td>
-                                        <td>Standard conditional branching.</td>
+                                        <td><code>[if condition] ... [end]</code></td>
+                                        <td><code>[if \$count &gt; 0] ... [else] ... [end]</code></td>
+                                        <td>Standard conditional branching with universal <code>[end]</code> closure.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@unless(condition)</code></td>
-                                        <td><code>@@unless(\$loggedIn) ... @@endunless</code></td>
+                                        <td><code>[unless condition]</code></td>
+                                        <td><code>[unless \$loggedIn] ... [end]</code></td>
                                         <td>Inverted condition (executes when condition is false).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@isset(\$variable)</code></td>
-                                        <td><code>@@isset(\$user-&gt;bio) ... @@endisset</code></td>
+                                        <td><code>[isset \$variable]</code></td>
+                                        <td><code>[isset \$user-&gt;bio] ... [end]</code></td>
                                         <td>Checks if a variable is set and not null.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@empty(\$variable)</code></td>
-                                        <td><code>@@empty(\$posts) ... @@endempty</code></td>
+                                        <td><code>[empty \$variable]</code></td>
+                                        <td><code>[empty \$posts] ... [end]</code></td>
                                         <td>Checks if a collection or variable is empty.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@foreach(\$items as \$item)</code></td>
-                                        <td><code>@@foreach(\$posts as \$post) ... @@endforeach</code></td>
+                                        <td><code>[each \$items as \$item]</code></td>
+                                        <td><code>[each \$posts as \$post] ... [end]</code></td>
                                         <td>Iterates over arrays, collections, or paginators.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@for(...)</code></td>
-                                        <td><code>@@for(\$i = 1; \$i &lt;= 5; \$i++) ... @@endfor</code></td>
+                                        <td><code>[each] ... [empty] ... [end]</code></td>
+                                        <td><code>[each \$posts as \$p] ... [empty] ... [end]</code></td>
+                                        <td>Iterate with automatic fallback when collection is empty (no forelse needed!).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>[for ...]</code></td>
+                                        <td><code>[for \$i = 1; \$i &lt;= 5; \$i++] ... [end]</code></td>
                                         <td>Standard numeric for loop.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@while(condition)</code></td>
-                                        <td><code>@@while(\$hasMore) ... @@endwhile</code></td>
+                                        <td><code>[while condition]</code></td>
+                                        <td><code>[while \$hasMore] ... [end]</code></td>
                                         <td>Standard while loop.</td>
                                     </tr>
 
@@ -1355,17 +1360,17 @@ class ArticleController extends BaseController
                                     </tr>
                                     <tr>
                                         <td><code>is_home()</code></td>
-                                        <td><code>@@unless(is_home()) ... @@endunless</code></td>
+                                        <td><code>[unless is_home()] ... [end]</code></td>
                                         <td>Returns <code>true</code> on homepage (<code>/</code> or named route <code>'home'</code>), <code>false</code> otherwise.</td>
                                     </tr>
                                     <tr>
                                         <td><code>is_route('name')</code></td>
-                                        <td><code>@@if(is_route('contact')) ... @@endif</code></td>
+                                        <td><code>[if is_route('contact')] ... [end]</code></td>
                                         <td>Checks if current route name or URI matches. Supports wildcards (<code>'blog.*'</code>).</td>
                                     </tr>
                                     <tr>
                                         <td><code>request_uri()</code></td>
-                                        <td><code>@@if(request_uri() !== '/') ... @@endif</code></td>
+                                        <td><code>[if request_uri() !== '/'] ... [end]</code></td>
                                         <td>Returns the current relative request path (without query parameters).</td>
                                     </tr>
                                     <tr>
