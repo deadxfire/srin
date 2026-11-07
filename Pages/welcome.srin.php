@@ -302,12 +302,18 @@ php srin migrate:fresh     # Drop all tables and re-run all migrations</code></p
                     <!-- 5. Database Models & Migrations -->
                     <section id="database-models" class="doc-card">
                         <h2>5. Database Models &amp; Migrations (ActiveRecord)</h2>
-                        <p>Srin Engine features an expressive ActiveRecord ORM and multi-dialect schema migration engine. Zero-setup <strong>SQLite</strong> is pre-configured by default, with complete support for <strong>MySQL</strong> and <strong>PostgreSQL</strong> via <code>Config/database.php</code>.</p>
+                        <p>Srin Engine features an expressive ActiveRecord ORM and a multi-dialect schema migration engine. Zero-setup <strong>SQLite</strong> is pre-configured by default, with complete support for <strong>MySQL</strong> and <strong>PostgreSQL</strong> via <code>Config/database.php</code>.</p>
 
-                        <h3>1. Create a Model &amp; Migration:</h3>
-                        <pre><code>php srin make:model Article -m</code></pre>
+                        <h3>1. Generate a Model &amp; Migration:</h3>
+                        <pre><code># Generate both the model and migration blueprint together:
+php srin make:model Article -m
 
-                        <h3>2. Define the Schema Blueprint:</h3>
+# Or create a standalone migration:
+php srin make:migration create_articles_table</code></pre>
+
+                        <h3>2. Detailed Migration Code Sample (<code>database/migrations/YYYY_MM_DD_HHMMSS_create_articles_table.php</code>):</h3>
+                        <p>Migrations extend <code>Core\Migration</code> and use <code>Core\Schema</code> with <code>Core\Blueprint</code>. Here is a production-grade schema demonstrating all column types, defaults, and modifiers:</p>
+                        
                         <pre><code>&lt;?php
 
 use Core\Migration;
@@ -315,74 +321,416 @@ use Core\Schema;
 use Core\Blueprint;
 
 return new class extends Migration {
+    /**
+     * Run the migrations.
+     */
     public function up(): void
     {
         Schema::create('articles', function (Blueprint \$table) {
+            // Auto-incrementing primary key ID
             \$table-&gt;id();
-            \$table-&gt;string('title');
+
+            // String and unique column
+            \$table-&gt;string('title', 255);
             \$table-&gt;string('slug')-&gt;unique();
-            \$table-&gt;text('content')-&gt;nullable();
+
+            // Text columns (nullable and required)
+            \$table-&gt;text('summary')-&gt;nullable();
+            \$table-&gt;text('content');
+
+            // Foreign keys and numbers with default values
+            \$table-&gt;integer('category_id')-&gt;nullable();
+            \$table-&gt;integer('views')-&gt;default(0);
+            \$table-&gt;decimal('price', 10, 2)-&gt;default(0.00);
+
+            // Boolean flags
             \$table-&gt;boolean('is_published')-&gt;default(true);
+            \$table-&gt;boolean('is_featured')-&gt;default(false);
+
+            // Status string
+            \$table-&gt;string('status', 50)-&gt;default('draft');
+
+            // Dates &amp; Timestamps
+            \$table-&gt;date('published_on')-&gt;nullable();
+            \$table-&gt;dateTime('scheduled_at')-&gt;nullable();
+
+            // Automatic created_at &amp; updated_at timestamps
             \$table-&gt;timestamps();
         });
     }
 
+    /**
+     * Reverse the migrations.
+     */
     public function down(): void
     {
         Schema::dropIfExists('articles');
     }
 };</code></pre>
 
-                        <h3>3. Run Migrations:</h3>
-                        <pre><code>php srin migrate</code></pre>
+                        <h3>3. Schema Blueprint Column Types Reference:</h3>
+                        <div class="helpers-table-wrapper">
+                            <table class="helpers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Blueprint Method</th>
+                                        <th>SQL Definition</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>\$table-&gt;id('id')</code></td>
+                                        <td><code>INTEGER PRIMARY KEY AUTO_INCREMENT</code></td>
+                                        <td>Primary key ID column.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;string('title', 255)</code></td>
+                                        <td><code>VARCHAR(255)</code></td>
+                                        <td>Standard string column.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;text('content')</code></td>
+                                        <td><code>TEXT</code></td>
+                                        <td>Multiline text block.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;integer('views')</code></td>
+                                        <td><code>INTEGER</code></td>
+                                        <td>Standard integer column.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;bigInteger('amount')</code></td>
+                                        <td><code>BIGINT</code></td>
+                                        <td>Large numeric identifier.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;boolean('is_active')</code></td>
+                                        <td><code>TINYINT(1) / BOOLEAN</code></td>
+                                        <td>True/false boolean flag.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;decimal('price', 10, 2)</code></td>
+                                        <td><code>DECIMAL(10, 2)</code></td>
+                                        <td>Fixed-point numbers for currency.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;float('rating')</code></td>
+                                        <td><code>FLOAT</code></td>
+                                        <td>Floating point numeric values.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;date('birth_date')</code></td>
+                                        <td><code>DATE</code></td>
+                                        <td>Date without time (YYYY-MM-DD).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;dateTime('event_at')</code></td>
+                                        <td><code>DATETIME</code></td>
+                                        <td>Date with time.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$table-&gt;timestamps()</code></td>
+                                        <td><code>created_at, updated_at</code></td>
+                                        <td>Automatic timestamp management.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;nullable()</code>, <code>-&gt;default(\$val)</code>, <code>-&gt;unique()</code></td>
+                                        <td>Column Modifiers</td>
+                                        <td>Can be chained on any column type.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
 
-                        <h3>4. Query with the ActiveRecord Model:</h3>
-                        <pre><code>use Model\Article;
+                        <h3>4. Migration Management CLI Commands:</h3>
+                        <pre><code># Run all pending migrations:
+php srin migrate
 
-// Create (mass-assignment protected by \$fillable)
-\$article = Article::create([
-    'title' =&gt; 'First Article',
-    'slug' =&gt; 'first-article',
-    'content' =&gt; 'Hello World from Srin Engine',
-]);
+# Check status of all migrations:
+php srin migrate:status
 
-// Find &amp; Query (PDO prepared statements prevent SQL injection)
-\$item = Article::find(1);
-\$published = Article::where('is_published', true)-&gt;latest()-&gt;get();
+# Rollback the last migration batch:
+php srin migrate:rollback
 
-// Update
-\$item-&gt;update(['title' =&gt; 'Updated Article Title']);
+# Wipe the database and re-run all migrations:
+php srin migrate:fresh</code></pre>
 
-// Delete
-\$item-&gt;delete();</code></pre>
+                        <h3>5. Corresponding Model Definition (<code>Model/Article.php</code>):</h3>
+                        <pre><code>&lt;?php
+
+namespace Model;
+
+use Core\Model;
+
+class Article extends Model
+{
+    // Custom table name (defaults to 'articles' automatically)
+    protected static string \$table = 'articles';
+
+    // Mass-assignment whitelist protection
+    protected array \$fillable = [
+        'title',
+        'slug',
+        'summary',
+        'content',
+        'category_id',
+        'price',
+        'is_published',
+        'is_featured',
+        'status',
+        'published_on',
+    ];
+
+    // Attributes guarded from mass-assignment
+    protected array \$guarded = ['id', 'views'];
+}</code></pre>
                     </section>
 
                     <!-- 6. Controllers -->
                     <section id="controllers" class="doc-card">
                         <h2>6. Writing Controllers</h2>
-                        <p>Controllers inherit useful helper methods from <code>BaseController</code>:</p>
+                        <p>Controllers reside in <code>Controller/</code> and extend <code>Core\BaseController</code>. They provide complete access to view rendering, model querying, HTTP input parsing, server-side validation, CSRF verification, rate limiting, flash messages, JSON APIs, and secure asset downloads.</p>
+
+                        <h3>Detailed Production Controller Code Sample (<code>Controller/ArticleController.php</code>):</h3>
                         <pre><code>&lt;?php
 
 namespace Controller;
 
 use Core\BaseController;
+use Model\Article;
 
-class PortfolioController extends BaseController
+class ArticleController extends BaseController
 {
+    /**
+     * Display a listing of articles.
+     */
     public function index(): string
     {
-        // Renders Pages/portfolio.srin.php
-        return $this->render('portfolio', [
-            'title' => 'My Portfolio',
-            'projects' => ['Project 1', 'Project 2']
+        // Query models using the fluent, SQL-injection-safe query builder
+        \$articles = Article::where('is_published', true)
+            -&gt;where('status', 'published')
+            -&gt;latest()
+            -&gt;get();
+
+        // Render Pages/articles/index.srin.php
+        return \$this-&gt;render('articles/index', [
+            'title'    =&gt; 'Latest Articles',
+            'articles' =&gt; \$articles,
         ]);
     }
 
+    /**
+     * Display a single article by slug.
+     */
+    public function show(string \$slug): string
+    {
+        \$article = Article::where('slug', \$slug)-&gt;first();
+
+        // Automatically abort with custom 404 error page if missing
+        if (!\$article) {
+            \$this-&gt;abort(404, 'Article not found');
+        }
+
+        // Increment views counter
+        \$article-&gt;views += 1;
+        \$article-&gt;save();
+
+        return \$this-&gt;render('articles/show', [
+            'title'   =&gt; \$article-&gt;title,
+            'article' =&gt; \$article,
+        ]);
+    }
+
+    /**
+     * Show form to create a new article.
+     */
+    public function create(): string
+    {
+        return \$this-&gt;render('articles/create', [
+            'title' =&gt; 'Create New Article',
+        ]);
+    }
+
+    /**
+     * Store a newly created article with full security defenses.
+     */
+    public function store()
+    {
+        // 1. Throttle requests to block DoS and brute-force flooding
+        \$this-&gt;rateLimit('article-create', 5, 60);
+
+        // 2. Defeat CSRF attacks (aborts with HTTP 419 on invalid token)
+        \$this-&gt;validateCsrf();
+
+        // 3. Defeat automated spam bots via invisible honeypot trap
+        \$this-&gt;validateHoneypot();
+
+        // 4. Whitelist allowed inputs to prevent mass-assignment attacks
+        \$inputs = \$this-&gt;onlyInputs([
+            'title', 'slug', 'summary', 'content', 'price', 'is_published'
+        ]);
+
+        // 5. Server-side data validation
+        \$errors = \$this-&gt;validate(\$inputs, [
+            'title'   =&gt; 'required|min:5|max:200',
+            'slug'    =&gt; 'required|min:3',
+            'content' =&gt; 'required|min:20',
+        ]);
+
+        // Redirect back with validation error messages if validation fails
+        if (!empty(\$errors)) {
+            return \$this-&gt;flash('errors', \$errors)-&gt;back();
+        }
+
+        // 6. Persist record using ActiveRecord Model
+        \$article = Article::create(\$inputs);
+
+        // 7. Redirect to named route with a success flash message
+        return \$this-&gt;flash('success', 'Article created successfully!')
+            -&gt;redirectToRoute('articles.show', ['slug' =&gt; \$article-&gt;slug]);
+    }
+
+    /**
+     * Update an existing article.
+     */
+    public function update(int \$id)
+    {
+        \$this-&gt;validateCsrf();
+
+        // Find record or automatically render 404 error page
+        \$article = Article::findOrFail(\$id);
+
+        \$data = \$this-&gt;onlyInputs(['title', 'summary', 'content', 'status']);
+        \$article-&gt;update(\$data);
+
+        return \$this-&gt;flash('success', 'Article updated!')
+            -&gt;redirectToRoute('articles.show', ['slug' =&gt; \$article-&gt;slug]);
+    }
+
+    /**
+     * Delete an article from database.
+     */
+    public function destroy(int \$id)
+    {
+        \$this-&gt;validateCsrf();
+
+        \$article = Article::findOrFail(\$id);
+        \$article-&gt;delete();
+
+        return \$this-&gt;flash('success', 'Article removed.')
+            -&gt;redirectToRoute('articles.index');
+    }
+
+    /**
+     * Return JSON response for API requests.
+     */
     public function api(): void
     {
-        $this->json(['status' => 'success']);
+        \$articles = Article::where('is_published', true)-&gt;latest()-&gt;get();
+
+        // JSON response with HTTP 200 OK
+        \$this-&gt;json([
+            'status' =&gt; 'success',
+            'count'  =&gt; count(\$articles),
+            'data'   =&gt; \$articles,
+        ], 200);
+    }
+
+    /**
+     * Serve a downloadable file securely strictly from assets/.
+     */
+    public function export(): void
+    {
+        // Non-asset directory downloads are blocked with 404 for security
+        \$this-&gt;download('downloads/articles-export.csv', 'Articles.csv');
     }
 }</code></pre>
+
+                        <h3>Controller Helper Methods Reference:</h3>
+                        <div class="helpers-table-wrapper">
+                            <table class="helpers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Method</th>
+                                        <th>Return Type</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>\$this-&gt;render(\$view, \$data)</code></td>
+                                        <td><code>string</code></td>
+                                        <td>Renders a <code>Pages/{view}.srin.php</code> template with layout.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;input(\$key, \$default)</code></td>
+                                        <td><code>mixed</code></td>
+                                        <td>Retrieves a sanitized input value from GET or POST.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;onlyInputs(\$keys)</code></td>
+                                        <td><code>array</code></td>
+                                        <td>Whitelists specific request fields (defeats mass-assignment).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;validate(\$inputs, \$rules)</code></td>
+                                        <td><code>array</code></td>
+                                        <td>Validates fields against rules (<code>required</code>, <code>email</code>, <code>min</code>, <code>max</code>).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;validateCsrf()</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Verifies CSRF token or terminates request with HTTP 419.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;validateHoneypot()</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Checks invisible bot field and aborts if filled by spam bots.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;rateLimit(\$key, \$max, \$decay)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Throttles requests and aborts with HTTP 429 if exceeded.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;flash(\$key, \$message)</code></td>
+                                        <td><code>\$this</code></td>
+                                        <td>Sets a session flash message available on the next request.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;redirectToRoute(\$name, \$params)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Redirects the browser to a registered route name.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;redirect(\$url)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Redirects the browser to an absolute or relative URL.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;back()</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Redirects back to previous page or referer.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;json(\$data, \$status)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Sends JSON response with appropriate headers and exits.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;download(\$file, \$name)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Streams a file download strictly from <code>assets/</code>.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;abort(\$code, \$message)</code></td>
+                                        <td><code>void</code></td>
+                                        <td>Terminates request and displays custom error template from <code>Pages/errors/</code>.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <!-- 7. Pages & Layouts -->
