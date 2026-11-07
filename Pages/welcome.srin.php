@@ -201,8 +201,8 @@ assets/images/banner.jpg</code></pre>
                         <pre><code>&lt;script src="{{assets('/js/main.js')}}"&gt;&lt;/script&gt;</code></pre>
 
                         <h3>Adding Public Images</h3>
-                        <p>Simply drop any image or folder inside <code>assets/images/</code> and link it directly:</p>
-                        <pre><code>&lt;img src="{{assets('/images/logo.png')}}" alt="Site Logo"&gt;
+                        <p>Simply drop any image or folder inside <code>assets/images/</code> and link it directly — <code>{{assets('logo.png')}}</code> automatically maps image filenames to the images directory without needing the folder location path, generating the complete direct URL:</p>
+                        <pre><code>&lt;img src="{{assets('logo.png')}}" alt="Site Logo"&gt;
 &lt;img src="{{assets('/images/portfolio/project-1.jpg')}}" alt="Project"&gt;</code></pre>
 
                         <h3>Adding Custom Asset Folders</h3>
@@ -212,7 +212,7 @@ assets/images/banner.jpg</code></pre>
 
                         <div class="highlight-box">
                             <strong>Note on Subfolders &amp; Production Servers:</strong>
-                            <code>{{assets('/...')}}</code> automatically calculates your server path whether your site is on a root domain (<code>https://mysite.com</code>) or inside a server subfolder (<code>https://mysite.com/subfolder/</code>).
+                            <code>{{assets('/...')}}</code> automatically generates the full absolute URL (e.g. <code>https://mysite.com/assets/...</code>) and detects whether your site is on a root domain (<code>https://mysite.com</code>) or inside a server subfolder (<code>https://mysite.com/subfolder/</code>).
                         </div>
                     </section>
 

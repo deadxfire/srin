@@ -21,7 +21,7 @@ return [
     'name' => env('APP_NAME', 'Srin Engine'),
 
     // Framework Version
-    'version' => env('APP_VERSION', '1.1.0'),
+    'version' => env('APP_VERSION', '1.1.1'),
 
     // Lead Developer / Architect
     'developer' => 'Arindam Makar',

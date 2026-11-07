@@ -1191,7 +1191,7 @@ function handleUpgrade(array $args, string $baseDir): void
     }
 
     // Determine local version
-    $localVersion = '1.1.0';
+    $localVersion = '1.1.1';
     if (file_exists($baseDir . '/Core/App.php')) {
         $appCode = (string) file_get_contents($baseDir . '/Core/App.php');
         if (preg_match("/public const VERSION = '([^']+)';/", $appCode, $m)) {

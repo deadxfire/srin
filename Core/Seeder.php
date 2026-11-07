@@ -75,3 +75,4 @@ abstract class Seeder
         throw new Exception("Seeder class [{$class}] could not be found or loaded from database/seeders/.");
     }
 }
+

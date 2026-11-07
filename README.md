@@ -669,8 +669,8 @@ Link assets directly inside `.srin.php` templates:
 <!-- JavaScript -->
 <script src="{{assets('/js/main.js')}}"></script>
 
-<!-- Images (supports nested folders) -->
-<img src="{{assets('/images/logo.png')}}" alt="Logo">
+<!-- Public Images (auto-resolves to assets/images/ without needing the folder location) -->
+<img src="{{assets('logo.png')}}" alt="Logo">
 <img src="{{assets('/images/portfolio/item-1.jpg')}}" alt="Project">
 
 <!-- Custom Asset Folders -->
@@ -678,7 +678,7 @@ Link assets directly inside `.srin.php` templates:
 <img src="{{assets('/icons/check.svg')}}" alt="Check">
 ```
 
-> **Subfolder & Production Safe:** `{{assets('/path')}}` automatically detects whether your site is on a root domain (`https://mysite.com`) or inside a server subfolder (`https://mysite.com/subfolder/`) and generates the exact absolute path.
+> **Direct Links & Subfolder Safe:** `{{assets('/path')}}` generates complete absolute URLs (e.g. `http://localhost:8000/assets/...`), auto-maps image filenames directly to `assets/images/`, and automatically detects whether your site is on a root domain (`https://mysite.com`) or inside a server subfolder (`https://mysite.com/subfolder/`).
 
 ---
 

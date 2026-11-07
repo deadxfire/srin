@@ -216,7 +216,7 @@ class View
 
         // 5. Built-in safe directive helpers (URLs and HTML fields)
         $template = preg_replace(
-            '/\{\{\s*assets?\s*\(\s*([\'"][^\'"]+[\'"])\s*\)\s*\}\}/i',
+            '/\{\{\s*assets?\s*\((.*?)\)\s*\}\}/i',
             '<?= assets($1) ?>',
             $template
         );
@@ -228,7 +228,7 @@ class View
         );
 
         $template = preg_replace(
-            '/\{\{\s*url\s*\(\s*([\'"][^\'"]+[\'"])\s*\)\s*\}\}/i',
+            '/\{\{\s*url\s*\((.*?)\)\s*\}\}/i',
             '<?= url($1) ?>',
             $template
         );

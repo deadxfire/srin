@@ -132,21 +132,139 @@ if (!function_exists('json')) {
     }
 }
 
-if (!function_exists('asset')) {
+if (!function_exists('app_origin')) {
     /**
-     * Generate an asset URL.
-     * Automatically handles subfolders on any production server.
+     * Get the base origin (scheme + host + optional subfolder) of the application.
+     * Automatically handles reverse proxies, HTTPS, and subdirectories.
      */
-    function asset(string $path): string
+    function app_origin(): string
     {
+        $configured = '';
+        if (function_exists('config')) {
+            $configured = (string) (config('base_url') ?: config('app.base_url', ''));
+        }
+        if ($configured === '' && function_exists('env')) {
+            $configured = (string) env('APP_BASE_URL', '');
+        }
+
+        // Subdirectory detection from SCRIPT_NAME (e.g. /my-subfolder)
         $scriptName = $_SERVER['SCRIPT_NAME'] ?? '';
         $baseDir = rtrim(str_replace('\\', '/', dirname($scriptName)), '/');
         if ($baseDir === '.' || $baseDir === '/') {
             $baseDir = '';
         }
-        $cleanPath = ltrim($path, '/');
-        
-        return ($baseDir !== '' ? $baseDir : '') . '/assets/' . $cleanPath;
+
+        // If a full absolute URL is specified in APP_BASE_URL, use it
+        if (preg_match('#^https?://#i', $configured)) {
+            $url = rtrim($configured, '/');
+            if ($baseDir !== '' && !str_ends_with($url, $baseDir)) {
+                $url .= $baseDir;
+            }
+            return $url;
+        }
+
+        // Dynamic scheme detection (including reverse proxies)
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+            || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+
+        $scheme = $isHttps ? 'https' : 'http';
+
+        // Host detection
+        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost:8000';
+        if (str_contains($host, ',')) {
+            $parts = explode(',', $host);
+            $host = trim($parts[0]);
+        }
+
+        return "{$scheme}://{$host}" . $baseDir;
+    }
+}
+
+if (!function_exists('asset')) {
+    /**
+     * Generate a direct, absolute URL for an asset.
+     * Automatically maps image filenames directly to assets/images/ without requiring the folder location path.
+     * Subfolder and HTTPS safe on all production web servers.
+     *
+     * Examples:
+     *   asset('logo.png')                      => http://localhost:8000/assets/images/logo.png
+     *   asset('banner.jpg')                    => http://localhost:8000/assets/images/banner.jpg
+     *   asset('images/logo.png')               => http://localhost:8000/assets/images/logo.png
+     *   asset('/assets/images/logo.png')       => http://localhost:8000/assets/images/logo.png
+     *   asset('css/style.css')                 => http://localhost:8000/assets/css/style.css
+     *   asset('')                              => http://localhost:8000/assets/
+     *   asset('https://cdn.com/pic.jpg')       => https://cdn.com/pic.jpg
+     */
+    function asset(string $path = ''): string
+    {
+        $trimmed = trim($path);
+
+        // 1. If empty, return base assets URL
+        if ($trimmed === '') {
+            return app_origin() . '/assets/';
+        }
+
+        // 2. Return external or protocol-relative URLs as-is
+        if (preg_match('#^(https?:)?//#i', $trimmed)) {
+            return $trimmed;
+        }
+
+        // 3. Normalize slashes
+        $cleanPath = str_replace('\\', '/', $trimmed);
+        $cleanPath = ltrim($cleanPath, '/');
+
+        // 4. Strip redundant leading 'assets/' prefix if passed
+        if (preg_match('#^assets/(.*)$#i', $cleanPath, $matches)) {
+            $cleanPath = $matches[1];
+        }
+
+        // 5. Separate query string (?v=1.0) and fragment (#anchor) for extension/file checks
+        $queryString = '';
+        $fragment = '';
+        if (($hashPos = strpos($cleanPath, '#')) !== false) {
+            $fragment = substr($cleanPath, $hashPos);
+            $cleanPath = substr($cleanPath, 0, $hashPos);
+        }
+        if (($queryPos = strpos($cleanPath, '?')) !== false) {
+            $queryString = substr($cleanPath, $queryPos);
+            $cleanPath = substr($cleanPath, 0, $queryPos);
+        }
+
+        // 6. Automatic image folder resolution:
+        // If the path doesn't already start with an asset category folder (images/, css/, js/, downloads/, fonts/),
+        // check if it is an image or exists in assets/images/.
+        $imageExtensions = ['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp', 'tiff'];
+        $ext = strtolower(pathinfo($cleanPath, PATHINFO_EXTENSION));
+
+        $categoryPrefixes = ['images/', 'css/', 'js/', 'downloads/', 'fonts/'];
+        $hasCategoryPrefix = false;
+        foreach ($categoryPrefixes as $prefix) {
+            if (str_starts_with(strtolower($cleanPath), $prefix)) {
+                $hasCategoryPrefix = true;
+                break;
+            }
+        }
+
+        if (!$hasCategoryPrefix) {
+            $baseDirLocal = dirname(__DIR__);
+            $assetsRoot = $baseDirLocal . DIRECTORY_SEPARATOR . 'assets';
+            $normalizedRelative = str_replace('/', DIRECTORY_SEPARATOR, $cleanPath);
+
+            $directAssetFile = $assetsRoot . DIRECTORY_SEPARATOR . $normalizedRelative;
+            $imageAssetFile  = $assetsRoot . DIRECTORY_SEPARATOR . 'images' . DIRECTORY_SEPARATOR . $normalizedRelative;
+
+            // If file does not exist directly in assets/ root, but exists in assets/images/ OR has an image extension:
+            if (!file_exists($directAssetFile) && (file_exists($imageAssetFile) || in_array($ext, $imageExtensions, true))) {
+                $cleanPath = 'images/' . $cleanPath;
+            }
+        }
+
+        // Re-attach query string and fragment
+        $cleanPath .= $queryString . $fragment;
+
+        return app_origin() . '/assets/' . $cleanPath;
     }
 }
 
@@ -154,7 +272,7 @@ if (!function_exists('assets')) {
     /**
      * Alias for asset() to match {{assets('/css/style.css')}} syntax.
      */
-    function assets(string $path): string
+    function assets(string $path = ''): string
     {
         return asset($path);
     }
