@@ -220,6 +220,38 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Sum of column values.
+     */
+    public static function sum(string $column): int|float
+    {
+        return static::query()->sum($column);
+    }
+
+    /**
+     * Average of column values.
+     */
+    public static function avg(string $column): int|float
+    {
+        return static::query()->avg($column);
+    }
+
+    /**
+     * Minimum column value.
+     */
+    public static function min(string $column): mixed
+    {
+        return static::query()->min($column);
+    }
+
+    /**
+     * Maximum column value.
+     */
+    public static function max(string $column): mixed
+    {
+        return static::query()->max($column);
+    }
+
+    /**
      * Search across one or multiple columns with SQL LIKE.
      * Example: Post::search('title', $q)->get();
      */
@@ -371,9 +403,37 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function hit(string $column = 'views', int $amount = 1): bool
     {
+        return $this->increment($column, $amount);
+    }
+
+    /**
+     * Increment a numeric column on the model instance.
+     * Atomically updates in database and updates model instance attribute.
+     * Example: $article->increment('views', 1);
+     */
+    public function increment(string $column, int $amount = 1): bool
+    {
         $current = (int) ($this->attributes[$column] ?? 0);
         $this->attributes[$column] = $current + $amount;
+
+        $pk = static::getPrimaryKey();
+        if ($this->exists && isset($this->attributes[$pk])) {
+            static::query()->where($pk, $this->attributes[$pk])->increment($column, $amount);
+            $this->original[$column] = $this->attributes[$column];
+            return true;
+        }
+
         return $this->save();
+    }
+
+    /**
+     * Decrement a numeric column on the model instance.
+     * Atomically updates in database and updates model instance attribute.
+     * Example: $article->decrement('stock', 1);
+     */
+    public function decrement(string $column, int $amount = 1): bool
+    {
+        return $this->increment($column, -$amount);
     }
 
     /**
@@ -448,7 +508,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
         $id = static::query()->insert($this->attributes);
         if ($id) {
-            $this->attributes[$pk] = $id;
+            $this->attributes[$pk] = is_numeric($id) ? (int) $id : $id;
         }
 
         $this->exists = true;

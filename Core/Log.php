@@ -101,3 +101,4 @@ class Log
         return true;
     }
 }
+

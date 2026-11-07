@@ -187,10 +187,7 @@ class Auth
             return false;
         }
 
-        $query = method_exists($modelClass, 'where') ? $modelClass::where('1', '1') : null;
-        if (!$query) {
-            return false;
-        }
+        $query = method_exists($modelClass, 'query') ? $modelClass::query() : new QueryBuilder($modelClass::getTable(), $modelClass);
 
         $passwordCol = function_exists('config') ? (string) config('auth.password_column', 'password') : 'password';
         $plainPassword = $password;

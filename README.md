@@ -510,9 +510,13 @@ $published = Article::where('is_published', true)
 
 $first = Article::where('slug', 'mastering-srin-engine')->first();
 
-// 4. Update
+// 4. Update & Atomic Increment/Decrement
 $article->title = 'Updated Title';
 $article->save();
+
+// Atomically increment or decrement numeric columns:
+$article->increment('views');        // Atomically increments by 1
+$article->decrement('stock', 2);     // Atomically decrements by 2
 
 // Or mass update:
 $article->update([
@@ -524,8 +528,12 @@ $article->delete();
 // Or delete by ID:
 Article::destroy(1);
 
-// 6. Aggregates & Checks
-$total = Article::where('is_published', true)->count();
+// 6. Aggregates & Checks (Zero PHP Memory Overhead)
+$total  = Article::where('is_published', true)->count();
+$views  = Article::sum('views');
+$avg    = Article::avg('views');
+$min    = Article::min('views');
+$max    = Article::max('views');
 $exists = Article::where('slug', 'test')->exists();
 
 // 7. Serialization

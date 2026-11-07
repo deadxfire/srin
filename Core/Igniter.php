@@ -330,7 +330,7 @@ class Igniter
             self::trigger('terminate');
         } catch (Throwable $e) {
             self::trigger('error', $e);
-            App::run(); // Fallback to App error handler
+            App::handleException($e, $isDebug);
         }
     }
 

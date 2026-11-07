@@ -458,6 +458,54 @@ class QueryBuilder
     }
 
     /**
+     * Calculate sum of column values.
+     */
+    public function sum(string $column): int|float
+    {
+        $cleanCol = $this->wrap($column);
+        $this->columns = ["SUM({$cleanCol}) as aggregate"];
+        $sql = $this->toSql();
+        $row = Database::select($sql, $this->bindings);
+        return $row[0]['aggregate'] !== null ? (float) $row[0]['aggregate'] : 0;
+    }
+
+    /**
+     * Calculate average of column values.
+     */
+    public function avg(string $column): int|float
+    {
+        $cleanCol = $this->wrap($column);
+        $this->columns = ["AVG({$cleanCol}) as aggregate"];
+        $sql = $this->toSql();
+        $row = Database::select($sql, $this->bindings);
+        return $row[0]['aggregate'] !== null ? (float) $row[0]['aggregate'] : 0;
+    }
+
+    /**
+     * Retrieve minimum value of column.
+     */
+    public function min(string $column): mixed
+    {
+        $cleanCol = $this->wrap($column);
+        $this->columns = ["MIN({$cleanCol}) as aggregate"];
+        $sql = $this->toSql();
+        $row = Database::select($sql, $this->bindings);
+        return $row[0]['aggregate'] ?? null;
+    }
+
+    /**
+     * Retrieve maximum value of column.
+     */
+    public function max(string $column): mixed
+    {
+        $cleanCol = $this->wrap($column);
+        $this->columns = ["MAX({$cleanCol}) as aggregate"];
+        $sql = $this->toSql();
+        $row = Database::select($sql, $this->bindings);
+        return $row[0]['aggregate'] ?? null;
+    }
+
+    /**
      * Check if any record exists.
      */
     public function exists(): bool

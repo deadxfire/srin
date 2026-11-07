@@ -264,8 +264,8 @@ class View
             . '|\{:(elseif\s+[^{}]+|else|empty)\}'
             . '|\{\/(if|each|for|while|unless|isset)\}'
             . '|\{end\}'
-            . '|(?<!@)@(if|elseif|foreach|for|while|unless|isset|empty)\s*\(((?:[^()]++|\((?11)\))*)\)'
-            . '|(?<!@)@(else|endif|endforeach|endfor|endwhile|endunless|endisset|endempty)\b'
+            . '|(?<!@)@(if|elseif|foreach|for|while|unless|isset|empty)\s*\((?<at_expr>(?:[^()]++|\((?&at_expr)\))*)\)'
+            . '|(?<!@)@(else|empty|endif|endforeach|endfor|endwhile|endunless|endisset|endempty)\b'
             . ')/i';
 
         $stack = [];
