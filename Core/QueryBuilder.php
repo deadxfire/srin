@@ -374,6 +374,33 @@ class QueryBuilder
     }
 
     /**
+     * Paginate the query results into a Paginator instance.
+     */
+    public function paginate(int $perPage = 15, ?int $page = null, string $pageName = 'page'): Paginator
+    {
+        if ($page === null) {
+            $page = isset($_GET[$pageName]) ? (int) $_GET[$pageName] : 1;
+        }
+        $page = max(1, $page);
+
+        // Clone query for total count without orders, limits, or offsets
+        $countQuery = clone $this;
+        $countQuery->columns = ['COUNT(*) as aggregate'];
+        $countQuery->orders = [];
+        $countQuery->limitValue = null;
+        $countQuery->offsetValue = null;
+        $sql = $countQuery->toSql();
+        $row = Database::select($sql, $countQuery->bindings);
+        $total = (int) ($row[0]['aggregate'] ?? 0);
+
+        // Fetch paginated slice of records
+        $this->limit($perPage)->offset(($page - 1) * $perPage);
+        $items = $this->get();
+
+        return new Paginator($items, $total, $perPage, $page, $pageName);
+    }
+
+    /**
      * Insert a record into the table.
      */
     public function insert(array $values): int|string

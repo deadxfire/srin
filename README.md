@@ -625,6 +625,35 @@ class BlogController extends BaseController
 }
 ```
 
+#### 5. Fluent Database Pagination (`Model::paginate()`):
+
+Paginate records with automatic calculation of total pages, count, query string preservation, and responsive HTML link controls:
+
+```php
+// In a Controller:
+$articles = Article::where('is_published', true)->latest()->paginate(10);
+
+// Preserve search / filter query parameters across pages:
+$articles->appends(['search' => $this->input('search')]);
+
+return $this->render('blog/index', ['articles' => $articles]);
+```
+
+In your `.srin.php` template:
+```html
+@foreach($articles as $article)
+    <article class="post">
+        <h2>{{ $article->title }}</h2>
+        <p>{{ $article->summary }}</p>
+    </article>
+@endforeach
+
+<!-- Render responsive pagination controls (prev, numbered pills, next): -->
+@paginate($articles)
+<!-- Or: -->
+{!! $articles->links() !!}
+```
+
 ---
 
 ## 🎨 Asset Linking with `{{assets('/path')}}`
@@ -735,6 +764,39 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 <!-- Includes with Custom Data -->
 @include('components.card', ['title' => 'Fast API', 'desc' => 'Lightweight PHP'])
 ```
+
+### 4. Complete Shortcode & Template Directive Reference (Cheat Sheet)
+
+| Category | Shortcode / Directive | Example Syntax | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Layouts** | `@Connect('layout')` | `@Connect('layouts/main')` | Connect page to a master layout in `Pages/layouts/` |
+| | `@title('Page Title')` | `@title('My Profile')` | Set the HTML page title variable `$title` |
+| | `@content('slot', 'fallback')` | `@content('header')` | Declare named injection slot in master layout |
+| | `@content` | `@content` | Main page body placeholder in master layout |
+| | `@contentConnect('slot')` | `@contentConnect('header') ... @endContentConnect` | Define section block to slot into layout |
+| | `@contentCconnect('slot')` | `@contentCconnect('footer') ... @endContentCconnect` | Alias with double-C spelling |
+| **Partials** | `@include('path.file')` | `@include('partials.navbar')` | Include reusable partial template (dot-notation) |
+| | `@include('path', $data)` | `@include('components.card', ['title' => 'Pro'])` | Include partial with custom scoped data |
+| **UI Controls** | `@paginate($paginator)` | `@paginate($articles)` | Render responsive HTML pagination with pill links |
+| | `@flash('key')` | `@flash('success')` | Render session flash alert banner if set |
+| **Security** | `@csrf` | `<form>@csrf</form>` | Inject hidden CSRF protection token input |
+| | `@honeypot` | `<form>@honeypot</form>` | Inject invisible spam-bot trap field |
+| | `{{ $expression }}` | `<h1>{{ $article->title }}</h1>` | Auto-escaped XSS-safe variable printing |
+| | `{!! $trustedHtml !!}` | `<div>{!! $post->content !!}</div>` | Raw unescaped HTML printing for rich text |
+| | `{{-- comment --}}` | `{{-- Secret dev note --}}` | Server-side comment (omitted from browser source) |
+| | `@{{ jsVariable }}` | `<span>@{{ vueCount }}</span>` | Escape braces for Vue / Alpine / React |
+| **Control Flow**| `@if / @elseif / @else` | `@if($count > 0) ... @endif` | Conditional branching |
+| | `@unless(condition)` | `@unless($isSubscribed) ... @endunless` | Inverted condition (`if (!condition)`) |
+| | `@isset($variable)` | `@isset($user->bio) ... @endisset` | Variable existence check |
+| | `@empty($variable)` | `@empty($posts) ... @endempty` | Empty check on arrays or variables |
+| | `@foreach($items as $item)` | `@foreach($articles as $a) ... @endforeach` | Iterate over arrays, models, or paginators |
+| | `@for(...)` | `@for($i = 1; $i <= 5; $i++) ... @endfor` | Standard numeric loop |
+| | `@while(condition)` | `@while($hasMore) ... @endwhile` | Standard while loop |
+| **Helpers** | `{{assets('/path')}}` | `<link href="{{assets('/css/app.css')}}">` | Absolute path to `assets/` (subfolder safe) |
+| | `{{route('name', $params)}}` | `<a href="{{route('blog.show', ['slug' => 'hi'])}}">` | Generate URL for named route |
+| | `{{url('/path')}}` | `<a href="{{url('/contact')}}">Contact</a>` | Application URL with subfolder auto-detection |
+| | `{{config('key', 'default')}}` | `<title>{{ config('name') }}</title>` | Read application configuration |
+| | `{{old('field')}}` | `<input value="{{ old('email') }}">` | Repopulate input after validation error |
 
 ---
 

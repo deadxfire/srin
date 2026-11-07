@@ -220,6 +220,14 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Paginate models directly.
+     */
+    public static function paginate(int $perPage = 15, ?int $page = null, string $pageName = 'page'): Paginator
+    {
+        return static::query()->paginate($perPage, $page, $pageName);
+    }
+
+    /**
      * Create and persist a new model instance.
      */
     public static function create(array $attributes): static

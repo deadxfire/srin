@@ -9,7 +9,7 @@ class App
     /**
      * Current framework version.
      */
-    public const VERSION = '1.0.8';
+    public const VERSION = '1.0.9';
 
     /**
      * Load environment variables from .env file into $_ENV, $_SERVER, and putenv().

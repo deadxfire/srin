@@ -195,6 +195,11 @@ class View
             '@@endisset'             => '%%ESCAPED_AT_ENDISSET%%',
             '@@empty'                => '%%ESCAPED_AT_EMPTY%%',
             '@@endempty'             => '%%ESCAPED_AT_ENDEMPTY%%',
+            '@@paginate'             => '%%ESCAPED_AT_PAGINATE%%',
+            '@@while'                => '%%ESCAPED_AT_WHILE%%',
+            '@@endwhile'             => '%%ESCAPED_AT_ENDWHILE%%',
+            '@@unless'               => '%%ESCAPED_AT_UNLESS%%',
+            '@@endunless'            => '%%ESCAPED_AT_ENDUNLESS%%',
         ];
         $template = strtr($template, $escaped);
 
@@ -292,6 +297,17 @@ class View
         $template = preg_replace('/(?<!@)@empty\s*\((.+?)\)/i', '<?php if (empty($1)): ?>', $template);
         $template = preg_replace('/(?<!@)@endempty\b/i', '<?php endif; ?>', $template);
 
+        // @paginate($paginator)
+        $template = preg_replace('/(?<!@)@paginate\s*\((.+?)\);?/i', '<?= ($1)->links() ?>', $template);
+
+        // @while(...)
+        $template = preg_replace('/(?<!@)@while\s*\((.+?)\)/i', '<?php while ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@endwhile\b/i', '<?php endwhile; ?>', $template);
+
+        // @unless(...)
+        $template = preg_replace('/(?<!@)@unless\s*\((.+?)\)/i', '<?php if (!($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@endunless\b/i', '<?php endif; ?>', $template);
+
         // 8. Restore escaped tokens as literal
         if (!empty($escapedTokens)) {
             $template = strtr($template, $escapedTokens);
@@ -321,6 +337,11 @@ class View
             '%%ESCAPED_AT_ENDISSET%%'           => '@endisset',
             '%%ESCAPED_AT_EMPTY%%'              => '@empty',
             '%%ESCAPED_AT_ENDEMPTY%%'           => '@endempty',
+            '%%ESCAPED_AT_PAGINATE%%'           => '@paginate',
+            '%%ESCAPED_AT_WHILE%%'              => '@while',
+            '%%ESCAPED_AT_ENDWHILE%%'           => '@endwhile',
+            '%%ESCAPED_AT_UNLESS%%'             => '@unless',
+            '%%ESCAPED_AT_ENDUNLESS%%'          => '@endunless',
         ];
         $template = strtr($template, $unEscape);
 

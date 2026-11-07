@@ -97,7 +97,8 @@
                 <a href="#quickstart">Quick Start</a>
                 <a href="#assets-guide">Assets</a>
                 <a href="#srin-cli">CLI</a>
-                <a href="#templates">.srin.php</a>
+                <a href="#templates">Shortcodes</a>
+                <a href="#database-models">Models &amp; Pagination</a>
                 <a href="#error-pages">Errors</a>
                 <a href="#mail-transfer">Mail</a>
                 <a href="https://github.com/deadxfire" target="_blank" style="color: var(--primary); font-weight: 600;">GitHub</a>
@@ -133,9 +134,9 @@
                             <li><a href="#assets-guide">2. Asset Linking</a></li>
                             <li><a href="#folder-structure">3. Folder Structure</a></li>
                             <li><a href="#srin-cli">4. CLI Commands (srin)</a></li>
-                            <li><a href="#database-models">5. Models &amp; Migrations</a></li>
+                            <li><a href="#database-models">5. Models, Migrations &amp; Pagination</a></li>
                             <li><a href="#controllers">6. Controllers</a></li>
-                            <li><a href="#templates">7. .srin.php &amp; @Connect</a></li>
+                            <li><a href="#templates">7. Shortcodes &amp; Templates</a></li>
                             <li><a href="#routing">8. Defining Routes</a></li>
                             <li><a href="#mail-transfer">9. Mail Transfer</a></li>
                             <li><a href="#composer">10. Composer &amp; Download</a></li>
@@ -550,6 +551,38 @@ echo \$post-&gt;user-&gt;name;
 
 // 4. Automatic nested JSON/Array serialization:
 \$data = \$users[0]-&gt;toArray(); // Includes 'posts' and 'profile' arrays</code></pre>
+
+                        <h3>7. Fluent Database Pagination: <code>Model::paginate(10)</code></h3>
+                        <p>Easily paginate large datasets with a single method. Returns an instance of <code>Core\Paginator</code> containing records, total counts, page metadata, query string preservation, and responsive HTML links:</p>
+
+                        <pre><code>// In a Controller:
+public function index(): string
+{
+    // Paginate 10 published articles per page:
+    \$articles = Article::where('is_published', true)
+        -&gt;latest()
+        -&gt;paginate(10);
+
+    // Optional: preserve search &amp; filter GET parameters across pages
+    \$articles-&gt;appends(['search' =&gt; \$this-&gt;input('search')]);
+
+    return \$this-&gt;render('articles/index', [
+        'articles' =&gt; \$articles
+    ]);
+}
+
+// In your .srin.php template:
+@@foreach(\$articles as \$article)
+    &lt;article class="article-card"&gt;
+        &lt;h2&gt;@{{ \$article-&gt;title }}&lt;/h2&gt;
+        &lt;p&gt;@{{ \$article-&gt;summary }}&lt;/p&gt;
+    &lt;/article&gt;
+@@endforeach
+
+&lt;!-- Render responsive pagination controls (prev, numbered pills, next): --&gt;
+@@paginate(\$articles)
+&lt;!-- Or render raw links: --&gt;
+@{!! \$articles-&gt;links() !!}</code></pre>
                     </section>
 
                     <!-- 6. Controllers -->
@@ -920,6 +953,196 @@ class ArticleController extends BaseController
     'price' =&gt; 99.00,
     'badge' =&gt; 'Popular'
 ])</code></pre>
+
+                        <h3>Master Shortcode &amp; Template Directive Reference:</h3>
+                        <p>Below is the complete cheat sheet of all template shortcodes and directives supported by Srin Engine:</p>
+
+                        <div class="helpers-table-wrapper">
+                            <table class="helpers-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 28%;">Shortcode / Directive</th>
+                                        <th style="width: 38%;">Syntax / Example</th>
+                                        <th>Purpose &amp; Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">1. Layouts, Slots &amp; Titles</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@Connect('layouts/name')</code></td>
+                                        <td><code>@@Connect('layouts/main')</code></td>
+                                        <td>Connects a child webpage to a master layout template in <code>Pages/layouts/</code>.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@title('Page Title')</code></td>
+                                        <td><code>@@title('Dashboard - Analytics')</code></td>
+                                        <td>Sets the page title variable <code>\$title</code> for the layout.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@content('name', 'fallback')</code></td>
+                                        <td><code>@@content('header', view('partials.nav'))</code></td>
+                                        <td>Defines a named slot in master layout with optional fallback content.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@content</code></td>
+                                        <td><code>@@content</code></td>
+                                        <td>Injects primary child page content into the layout.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@contentConnect('name')</code></td>
+                                        <td><code>@@contentConnect('header') ... @@endContentConnect</code></td>
+                                        <td>Defines custom content block on webpage to inject into matching layout slot.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@contentCconnect('name')</code></td>
+                                        <td><code>@@contentCconnect('footer') ... @@endContentCconnect</code></td>
+                                        <td>Alias for <code>@@contentConnect</code> (supports double-C spelling).</td>
+                                    </tr>
+
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">2. Partials &amp; Components</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@include('path.file')</code></td>
+                                        <td><code>@@include('partials.navbar')</code></td>
+                                        <td>Directly includes a reusable partial view. Supports dot-notation and slash paths.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@include('name', \$data)</code></td>
+                                        <td><code>@@include('components.card', ['title' =&gt; 'Pro'])</code></td>
+                                        <td>Includes a partial while passing custom scoped variables.</td>
+                                    </tr>
+
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">3. Database &amp; UI Controls</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@paginate(\$paginator)</code></td>
+                                        <td><code>@@paginate(\$articles)</code></td>
+                                        <td>Renders modern, responsive HTML pagination controls with numbered pills &amp; prev/next links.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@flash('key')</code></td>
+                                        <td><code>@@flash('success')</code>, <code>@@flash('error')</code></td>
+                                        <td>Automatically renders session flash message alerts if present.</td>
+                                    </tr>
+
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">4. Security &amp; Anti-Hacking Directives</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@csrf</code></td>
+                                        <td><code>@@csrf</code></td>
+                                        <td>Renders hidden cryptographic CSRF protection input field inside forms.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@honeypot</code></td>
+                                        <td><code>@@honeypot</code></td>
+                                        <td>Renders invisible anti-bot honeypot input field to trap automated spam bots.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@{{ \$expression }}</code></td>
+                                        <td><code>@{{ \$article-&gt;title }}</code></td>
+                                        <td>Evaluates PHP and automatically escapes output with <code>htmlspecialchars</code> (XSS-safe).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@{!! \$trustedHtml !!}</code></td>
+                                        <td><code>@{!! \$article-&gt;body !!}</code></td>
+                                        <td>Renders raw, unescaped HTML content (for trusted rich text editors).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@{{-- comment --}}</code></td>
+                                        <td><code>@{{-- Internal developer notes --}}</code></td>
+                                        <td>Server-side comment, completely stripped and omitted from HTML source code.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@@{{ clientVar }}</code></td>
+                                        <td><code>@@@{{ vueCount }}</code></td>
+                                        <td>Escapes braces for frontend JavaScript frameworks (Vue.js, Alpine.js, React).</td>
+                                    </tr>
+
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">5. Template Control Flow Directives</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@if / @@elseif / @@else</code></td>
+                                        <td><code>@@if(\$count &gt; 0) ... @@else ... @@endif</code></td>
+                                        <td>Standard conditional branching.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@unless(condition)</code></td>
+                                        <td><code>@@unless(\$loggedIn) ... @@endunless</code></td>
+                                        <td>Inverted condition (executes when condition is false).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@isset(\$variable)</code></td>
+                                        <td><code>@@isset(\$user-&gt;bio) ... @@endisset</code></td>
+                                        <td>Checks if a variable is set and not null.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@empty(\$variable)</code></td>
+                                        <td><code>@@empty(\$posts) ... @@endempty</code></td>
+                                        <td>Checks if a collection or variable is empty.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@foreach(\$items as \$item)</code></td>
+                                        <td><code>@@foreach(\$posts as \$post) ... @@endforeach</code></td>
+                                        <td>Iterates over arrays, collections, or paginators.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@for(...)</code></td>
+                                        <td><code>@@for(\$i = 1; \$i &lt;= 5; \$i++) ... @@endfor</code></td>
+                                        <td>Standard numeric for loop.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>@@while(condition)</code></td>
+                                        <td><code>@@while(\$hasMore) ... @@endwhile</code></td>
+                                        <td>Standard while loop.</td>
+                                    </tr>
+
+                                    <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
+                                        <td colspan="3">6. Template Helper Functions (Inside <code>@{{ }}</code>)</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>assets('/path')</code></td>
+                                        <td><code>@{{assets('/css/style.css')}}</code></td>
+                                        <td>Generates absolute URL directly to assets folder (subfolder safe).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>route('name', \$params)</code></td>
+                                        <td><code>@{{route('posts.show', ['slug' =&gt; 'hi'])}}</code></td>
+                                        <td>Generates URL for a named route from <code>Routes/web.php</code>.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>url('/path')</code></td>
+                                        <td><code>@{{url('/contact')}}</code></td>
+                                        <td>Generates application URL with subfolder auto-detection.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>config('key', 'default')</code></td>
+                                        <td><code>@{{config('app.name')}}</code></td>
+                                        <td>Retrieves application configuration values.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>old('field', 'default')</code></td>
+                                        <td><code>@{{old('email')}}</code></td>
+                                        <td>Retrieves previous form input after a validation error.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>csrf_field()</code></td>
+                                        <td><code>@{{csrf_field()}}</code></td>
+                                        <td>HTML hidden input containing CSRF security token.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>honeypot_field()</code></td>
+                                        <td><code>@{{honeypot_field()}}</code></td>
+                                        <td>HTML hidden input for anti-bot spam prevention.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <!-- 8. Defining Routes -->
