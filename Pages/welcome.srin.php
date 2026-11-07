@@ -1261,14 +1261,9 @@ class ArticleController extends BaseController
                                         <td>Server-side comment, completely stripped and omitted from HTML source code.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@{{ \$expression }}</code></td>
-                                        <td><code>@{{ \$article-&gt;title }}</code></td>
-                                        <td>Backward-compatible classic curly brace syntax also fully supported.</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>@{!! \$trustedHtml !!}</code></td>
-                                        <td><code>@{!! \$article-&gt;body !!}</code></td>
-                                        <td>Backward-compatible classic raw output syntax.</td>
+                                        <td><code>@[[ clientVar ]]</code></td>
+                                        <td><code>@[[ vueCount ]]</code></td>
+                                        <td>Escapes brackets for frontend JavaScript frameworks (Vue.js, Alpine.js, React).</td>
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">

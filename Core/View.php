@@ -195,40 +195,25 @@ class View
             throw new Exception("Srin Template Error: Blade directive '{$bladeMatch[0]}' is not supported in Srin Engine. Please use Srin Tags instead (e.g. [if ...], [each ...], [end], [layout '...'], [include '...']).");
         }
 
-        // 1. Strip comments: {{-- ... --}} or [-- ... --]
-        $template = preg_replace('/\{\{--.*?--\}\}/s', '', $template);
+        // 1. Strip comments: [-- ... --]
         $template = preg_replace('/\[--.*?--\]/s', '', $template);
 
-        // 2. Temporarily protect escaped braces/brackets: @{{ ... }}, @{!! ... !!}, @[[ ... ]], @[{ ... }]
+        // 2. Temporarily protect escaped brackets: @[[ ... ]] or @[{ ... }]
         $escapedTokens = [];
-        $template = preg_replace_callback('/@(\{\{.*?\}\}|\{!!.*?!!\}|\[\[.*?\]\]|\[\{.*?\}\])/s', function ($m) use (&$escapedTokens) {
+        $template = preg_replace_callback('/@(\[\[.*?\]\]|\[\{.*?\}\])/s', function ($m) use (&$escapedTokens) {
             $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
             $escapedTokens[$token] = $m[1]; // Store literal content without '@'
             return $token;
         }, $template);
 
-        // 3. Raw / unescaped HTML output: [{ $expression }] (Srin standard) or {!! $expression !!}
+        // 3. Raw / unescaped HTML output: [{ $expression }] (Srin standard)
         $template = preg_replace('/\[\{\s*(.+?)\s*\}\]/s', '<?= $1 ?>', $template);
-        $template = preg_replace('/\{!!\s*(.+?)\s*!!\}/s', '<?= $1 ?>', $template);
 
         // 4. Double brackets safe output: [[ $expression ]] (Srin standard)
         $template = preg_replace_callback('/\[\[\s*(.+?)\s*\]\]/s', function ($m) {
             $expr = trim($m[1]);
             if ($expr === '') {
                 return '[[ ]]';
-            }
-            $expr = rtrim($expr, ';');
-            if (preg_match('/^(?:assets?|route|url|csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
-                return "<?= {$expr} ?>";
-            }
-            return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
-        }, $template);
-
-        // 4b. Curly braces safe output: {{ $expression }} (Backward compatibility)
-        $template = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($m) {
-            $expr = trim($m[1]);
-            if ($expr === '') {
-                return '{{ }}';
             }
             $expr = rtrim($expr, ';');
             if (preg_match('/^(?:assets?|route|url|csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
