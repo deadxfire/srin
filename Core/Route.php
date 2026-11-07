@@ -9,11 +9,39 @@ class Route
     protected mixed $handler;
     protected ?string $name = null;
 
+    /**
+     * Checkpoints assigned to this route.
+     * @var array<string|object>
+     */
+    protected array $checkpoints = [];
+
     public function __construct(string $method, string $path, mixed $handler)
     {
         $this->method = strtoupper($method);
         $this->path = '/' . trim($path, '/');
         $this->handler = $handler;
+    }
+
+    /**
+     * Attach one or more checkpoints (gates) to this route.
+     * Example: Router::get('/admin', 'Admin@index')->checkpoint('auth');
+     * Example: Router::get('/reports', 'Report@index')->checkpoint(['auth', 'admin']);
+     */
+    public function checkpoint(string|array $checkpoints): self
+    {
+        $list = is_array($checkpoints) ? $checkpoints : func_get_args();
+        foreach ($list as $cp) {
+            $this->checkpoints[] = $cp;
+        }
+        return $this;
+    }
+
+    /**
+     * Get checkpoints attached to this route.
+     */
+    public function getCheckpoints(): array
+    {
+        return $this->checkpoints;
     }
 
     /**

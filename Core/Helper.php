@@ -609,6 +609,56 @@ if (!function_exists('srin')) {
     }
 }
 
+if (!function_exists('auth')) {
+    /**
+     * Get the currently authenticated identity model instance, or null.
+     */
+    function auth(): ?object
+    {
+        return \Core\Auth::user();
+    }
+}
+
+if (!function_exists('auth_check')) {
+    /**
+     * Determine if current visitor is authenticated.
+     */
+    function auth_check(): bool
+    {
+        return \Core\Auth::check();
+    }
+}
+
+if (!function_exists('auth_id')) {
+    /**
+     * Get the authenticated user ID.
+     */
+    function auth_id(): ?int
+    {
+        return \Core\Auth::id();
+    }
+}
+
+if (!function_exists('auth_guest')) {
+    /**
+     * Determine if current visitor is a guest (not authenticated).
+     */
+    function auth_guest(): bool
+    {
+        return \Core\Auth::guest();
+    }
+}
+
+if (!function_exists('auth_user')) {
+    /**
+     * Alias for auth().
+     */
+    function auth_user(): ?object
+    {
+        return \Core\Auth::user();
+    }
+}
+
 
 
 

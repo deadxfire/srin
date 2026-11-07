@@ -43,6 +43,7 @@ if (file_exists($composerAutoload)) {
             'Core\\'       => __DIR__ . '/Core/',
             'Config\\'     => __DIR__ . '/Config/',
             'Model\\'      => __DIR__ . '/Model/',
+            'Checkpoint\\' => __DIR__ . '/Checkpoint/',
         ];
 
         foreach ($prefixes as $prefix => $baseDir) {

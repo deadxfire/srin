@@ -33,6 +33,7 @@
             "Core\\": "Core/",
             "Config\\": "Config/",
             "Model\\": "Model/",
+            "Checkpoint\\": "Checkpoint/",
             "Database\\Seeders\\": "database/seeders/"
         },
         "files": [

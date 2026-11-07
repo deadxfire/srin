@@ -96,6 +96,28 @@ class Router
     protected static mixed $fallbackHandler = null;
 
     /**
+     * Active route group stack for nested prefixes, checkpoints, and names.
+     * @var array<array>
+     */
+    protected static array $groupStack = [];
+
+    /**
+     * Create a route group sharing attributes like prefix, checkpoint, and name.
+     *
+     * Example:
+     *   Router::group(['prefix' => '/admin', 'checkpoint' => 'auth'], function() {
+     *       Router::get('/dashboard', 'AdminController@dashboard', 'admin.dashboard');
+     *       Router::get('/users', 'AdminController@users', 'admin.users');
+     *   });
+     */
+    public static function group(array $attributes, Closure $callback): void
+    {
+        self::$groupStack[] = $attributes;
+        $callback();
+        array_pop(self::$groupStack);
+    }
+
+    /**
      * Register a GET route with optional direct route name.
      * Example: Router::get('/articles', 'ArticleController@index', 'articles.index');
      */
@@ -165,11 +187,31 @@ class Router
     }
 
     /**
-     * Internal helper to register a route.
+     * Internal helper to register a route with active group attributes.
      */
     protected static function addRoute(string $method, string $path, mixed $handler): Route
     {
-        $route = new Route($method, $path, $handler);
+        $prefix = '';
+        $checkpoints = [];
+
+        foreach (self::$groupStack as $group) {
+            if (!empty($group['prefix'])) {
+                $prefix .= '/' . trim($group['prefix'], '/');
+            }
+            if (!empty($group['checkpoint'])) {
+                $cps = is_array($group['checkpoint']) ? $group['checkpoint'] : [$group['checkpoint']];
+                $checkpoints = array_merge($checkpoints, $cps);
+            }
+        }
+
+        $fullPath = $prefix !== '' ? $prefix . '/' . ltrim($path, '/') : $path;
+
+        $route = new Route($method, $fullPath, $handler);
+
+        if (!empty($checkpoints)) {
+            $route->checkpoint($checkpoints);
+        }
+
         self::$routes[] = $route;
         return $route;
     }
@@ -231,7 +273,18 @@ class Router
                 array_shift($matches); // Remove full match
                 self::$currentRoute = $route;
 
-                $result = self::executeHandler($route->getHandler(), $matches);
+                $checkpoints = $route->getCheckpoints();
+
+                $action = function () use ($route, $matches) {
+                    return self::executeHandler($route->getHandler(), $matches);
+                };
+
+                // Run request through attached checkpoints
+                if (!empty($checkpoints)) {
+                    $result = Checkpoint::run($checkpoints, $action);
+                } else {
+                    $result = $action();
+                }
 
                 if (is_string($result)) {
                     Response::html($result);

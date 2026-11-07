@@ -40,6 +40,11 @@ switch ($command) {
         handleMakeController($arguments, $baseDir);
         break;
 
+    case 'make:checkpoint':
+    case 'make:gate':
+        handleMakeCheckpoint($arguments, $baseDir);
+        break;
+
     case 'make:model':
         handleMakeModel($arguments, $baseDir);
         break;
@@ -251,6 +256,80 @@ PHP;
     } else {
         echo color("  Router::get('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n\n", 'bold');
     }
+}
+
+/**
+ * Handle make:checkpoint command.
+ */
+function handleMakeCheckpoint(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a checkpoint name.\n", 'yellow');
+        echo "Usage: php srin make:checkpoint <Name>\n";
+        echo "Example: php srin make:checkpoint VerifySubscription\n\n";
+        return;
+    }
+
+    $cleanName = preg_replace('/[^a-zA-Z0-9_]/', '', $name);
+    if (!str_ends_with($cleanName, 'Checkpoint')) {
+        $cleanName .= 'Checkpoint';
+    }
+
+    $dir = $baseDir . '/Checkpoint';
+    if (!is_dir($dir)) {
+        mkdir($dir, 0755, true);
+    }
+
+    $filePath = $dir . "/{$cleanName}.php";
+
+    if (file_exists($filePath)) {
+        echo color("\n[X] Error: Checkpoint [{$cleanName}] already exists at Checkpoint/{$cleanName}.php\n\n", 'red');
+        return;
+    }
+
+    $template = <<<PHP
+<?php
+
+namespace Checkpoint;
+
+use Core\Checkpoint;
+
+class {$cleanName} extends Checkpoint
+{
+    /**
+     * Inspect incoming request before controller executes.
+     * Return true (or null) to ALLOW passage.
+     * Return a redirect, Response, or false to HALT and block.
+     */
+    public function enter(): mixed
+    {
+        // Example logic:
+        // if (!auth_check()) {
+        //     flash('error', 'Please sign in to access this page.');
+        //     redirect('/login');
+        //     return false;
+        // }
+
+        return true;
+    }
+
+    /**
+     * Optional filter executed after the controller finishes.
+     */
+    public function leave(mixed \$result): mixed
+    {
+        return \$result;
+    }
+}
+PHP;
+
+    file_put_contents($filePath, $template);
+
+    echo color("\n[+] Success: Checkpoint [{$cleanName}] created at Checkpoint/{$cleanName}.php\n", 'green');
+    echo "Usage in routes:\n";
+    echo "  Router::get('/secure', 'SecureController@index')->checkpoint(\Checkpoint\\{$cleanName}::class);\n\n";
 }
 
 /**
@@ -1566,6 +1645,7 @@ function showHelp(): void
     echo color("AVAILABLE COMMANDS:\n", 'yellow');
     echo "  " . color("make:controller <Name>", 'green') . "      Create a new controller in Controller/\n";
     echo "  " . color("make:controller <Name> --mail", 'green') . " Create a controller with mail transfer methods\n";
+    echo "  " . color("make:checkpoint <Name>", 'green') . "      Create a request checkpoint (gate) in Checkpoint/\n";
     echo "  " . color("make:model <Name> [-m]", 'green') . "         Create a model in Model/ (and migration with -m)\n";
     echo "  " . color("make:migration <name>", 'green') . "          Create a migration in database/migrations/\n";
     echo "  " . color("migrate", 'green') . "                        Run all pending database migrations\n";

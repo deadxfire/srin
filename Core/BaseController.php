@@ -225,6 +225,57 @@ class BaseController
     }
 
     /**
+     * Get currently authenticated identity model instance.
+     */
+    protected function auth(): ?object
+    {
+        return Auth::user();
+    }
+
+    /**
+     * Check if visitor is authenticated.
+     */
+    protected function authCheck(): bool
+    {
+        return Auth::check();
+    }
+
+    /**
+     * Get authenticated user ID.
+     */
+    protected function userId(): ?int
+    {
+        return Auth::id();
+    }
+
+    /**
+     * Require visitor to be authenticated, or redirect to login.
+     */
+    protected function requireAuth(?string $redirectRoute = null): object
+    {
+        $user = Auth::user();
+        if (!$user) {
+            $route = $redirectRoute ?? (function_exists('config') ? config('auth.login_route', 'auth.login') : 'auth.login');
+            $this->flashError('Please sign in to access this page.');
+            $this->redirectToRoute($route);
+            exit;
+        }
+        return $user;
+    }
+
+    /**
+     * Require visitor to be a guest, or redirect away.
+     */
+    protected function requireGuest(?string $redirectRoute = null): void
+    {
+        if (Auth::check()) {
+            $route = $redirectRoute ?? (function_exists('config') ? config('auth.home_route', 'home') : 'home');
+            $this->redirectToRoute($route);
+            exit;
+        }
+    }
+
+    /**
      * Get input strictly as string (prevents array injection).
      */
     protected function stringInput(string $key, string $default = ''): string
