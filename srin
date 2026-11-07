@@ -100,6 +100,11 @@ switch ($command) {
         handleListRoutes($baseDir);
         break;
 
+    case 'logs':
+    case 'log':
+        handleLogs($arguments, $baseDir);
+        break;
+
     case 'clear:logs':
         handleClearLogs($baseDir);
         break;
@@ -791,16 +796,104 @@ function handleListRoutes(string $baseDir): void
 }
 
 /**
- * Handle clearing mail logs.
+ * Handle logs command.
+ */
+function handleLogs(array $args, string $baseDir): void
+{
+    $isMail = in_array('--mail', $args);
+    $isClear = in_array('--clear', $args);
+    $isTail = in_array('--tail', $args) || in_array('-f', $args);
+    $linesCount = 25;
+
+    foreach ($args as $arg) {
+        if (str_starts_with($arg, '--lines=')) {
+            $linesCount = max(1, (int) substr($arg, 8));
+        }
+    }
+
+    $logFile = $baseDir . ($isMail ? '/Others/logs/mail.log' : '/Others/logs/srin.log');
+
+    if ($isClear) {
+        handleClearLogs($baseDir);
+        return;
+    }
+
+    if (!file_exists($logFile) || filesize($logFile) === 0) {
+        $name = $isMail ? 'Mail' : 'Application';
+        echo color("\n[i] {$name} log is currently empty ({$logFile}).\n\n", 'cyan');
+        return;
+    }
+
+    echo "\n" . color("=== Srin Engine Log Viewer (" . basename($logFile) . ") ===", 'bold') . "\n";
+    echo "Path: " . color($logFile, 'cyan') . "\n\n";
+
+    // Read last N lines
+    $all = file($logFile, FILE_IGNORE_NEW_LINES);
+    $lastLines = array_slice($all, -$linesCount);
+
+    foreach ($lastLines as $line) {
+        $formatted = $line;
+        if (str_contains($line, 'ERROR:')) {
+            $formatted = preg_replace('/(ERROR:)/', color('$1', 'red'), $formatted);
+        } elseif (str_contains($line, 'WARNING:')) {
+            $formatted = preg_replace('/(WARNING:)/', color('$1', 'yellow'), $formatted);
+        } elseif (str_contains($line, 'INFO:')) {
+            $formatted = preg_replace('/(INFO:)/', color('$1', 'green'), $formatted);
+        } elseif (str_contains($line, 'DEBUG:')) {
+            $formatted = preg_replace('/(DEBUG:)/', color('$1', 'cyan'), $formatted);
+        }
+        echo "  " . $formatted . "\n";
+    }
+
+    echo "\n" . color("Options: ", 'yellow');
+    echo color("php srin logs -f", 'green') . " (live tail) | ";
+    echo color("php srin logs --mail", 'green') . " (mail log) | ";
+    echo color("php srin clear:logs", 'green') . " (clear)\n\n";
+
+    if ($isTail) {
+        echo color("Tailing {$logFile} in real-time... Press Ctrl+C to exit.\n\n", 'yellow');
+        $lastSize = filesize($logFile);
+        while (true) {
+            clearstatcache(false, $logFile);
+            $currentSize = filesize($logFile);
+            if ($currentSize > $lastSize) {
+                $handle = fopen($logFile, 'r');
+                fseek($handle, $lastSize);
+                while (($newChunk = fgets($handle)) !== false) {
+                    echo "  " . trim($newChunk) . "\n";
+                }
+                $lastSize = ftell($handle);
+                fclose($handle);
+            } elseif ($currentSize < $lastSize) {
+                $lastSize = 0;
+            }
+            usleep(500000);
+        }
+    }
+}
+
+/**
+ * Handle clearing logs.
  */
 function handleClearLogs(string $baseDir): void
 {
-    $logFile = $baseDir . '/Others/logs/mail.log';
-    if (file_exists($logFile)) {
-        file_put_contents($logFile, '');
-        echo color("\n[✓] Mail log (Others/logs/mail.log) cleared.\n\n", 'green');
+    $appLog = $baseDir . '/Others/logs/srin.log';
+    $mailLog = $baseDir . '/Others/logs/mail.log';
+    $cleared = [];
+
+    if (file_exists($appLog)) {
+        file_put_contents($appLog, '');
+        $cleared[] = 'srin.log';
+    }
+    if (file_exists($mailLog)) {
+        file_put_contents($mailLog, '');
+        $cleared[] = 'mail.log';
+    }
+
+    if (!empty($cleared)) {
+        echo color("\n[✓] Logs cleared: " . implode(', ', $cleared) . " (Others/logs/)\n\n", 'green');
     } else {
-        echo color("\nNo mail log file found.\n\n", 'yellow');
+        echo color("\n[i] Logs directory is already empty.\n\n", 'cyan');
     }
 }
 
@@ -1659,7 +1752,8 @@ function showHelp(): void
     echo "  " . color("make:partial <name>", 'green') . "         Create a reusable partial (Pages/partials/name.srin.php)\n";
     echo "  " . color("make:error <code>", 'green') . "           Create custom error page (Pages/errors/code.srin.php)\n";
     echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/web.php\n";
-    echo "  " . color("clear:logs", 'green') . "                  Clear mail development logs\n";
+    echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . " View application logs in terminal (live tail with -f)\n";
+    echo "  " . color("clear:logs", 'green') . "                  Clear application and mail logs\n";
     echo "  " . color("serve [--port=8000]", 'green') . "         Start PHP's built-in development server\n";
     echo "  " . color("upgrade [--force] [--check]", 'green') . " Upgrade Srin Engine to latest release with overwrite\n";
     echo "  " . color("help", 'green') . "                        Display this help screen\n\n";

@@ -132,3 +132,4 @@ abstract class Checkpoint
         return $result;
     }
 }
+

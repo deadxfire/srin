@@ -42,3 +42,4 @@ class AuthCheckpoint extends Checkpoint
         return true;
     }
 }
+

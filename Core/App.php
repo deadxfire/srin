@@ -74,6 +74,12 @@ class App
      */
     public static function handleException(Throwable $e, bool $isDebug): void
     {
+        // 1. Automatically log error event to Others/logs/srin.log
+        Log::error($e->getMessage(), [
+            'file' => $e->getFile(),
+            'line' => $e->getLine(),
+        ]);
+
         Response::status(500);
 
         if ($isDebug) {

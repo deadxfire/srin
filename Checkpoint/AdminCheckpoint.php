@@ -45,3 +45,4 @@ class AdminCheckpoint extends Checkpoint
         return true;
     }
 }
+

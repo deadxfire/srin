@@ -38,3 +38,4 @@ class GuestCheckpoint extends Checkpoint
         return true;
     }
 }
+

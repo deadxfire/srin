@@ -284,31 +284,46 @@ Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
 <span>@{{ vueData }}</span> <!-- Compiles literally to {{ vueData }} -->
 ```
 
-### Control Flow Directives:
+### Control Flow: Clean Srin Tags (Zero Laravel Copycat):
 ```html
-@if(count($items) > 0)
-    <ul>
-    @foreach($items as $item)
-        <li>{{ $item['name'] }}</li>
-    @endforeach
-    </ul>
-@else
-    <p>No items found.</p>
-@endif
+[if $user]
+    <h2>Welcome back, {{ $user->name }}!</h2>
+[else]
+    <a href="{{ route('auth.login') }}">Sign In</a>
+[end]
+
+[each $posts as $post]
+    <article>
+        <h3>{{ $post->title }}</h3>
+        <p>{{ $post->excerpt }}</p>
+    </article>
+[empty]
+    <p>No articles published yet.</p>
+[end]
 ```
 
 ---
 
 ## 🛠️ Srin CLI Generator Commands (`php srin`)
 
-Run `php srin` (or `php srin.php`) to generate controllers, models, migrations, pages, layouts, and error templates:
+Run `php srin` (or `php srin.php`) to generate controllers, checkpoints, models, migrations, pages, layouts, and manage logs:
 
 ```bash
 # 1. Start development server
 php srin serve
 php srin serve --port=8080
 
-# 2. Database Models & Migrations
+# 2. Application Logging (Terminal Log Viewer)
+php srin logs                        # View latest application log entries
+php srin logs -f                     # Live stream / tail logs in real-time (Ctrl+C to stop)
+php srin logs --lines=50             # View last 50 log lines
+php srin logs --mail                 # View mail delivery log
+php srin clear:logs                  # Clear all log files in Others/logs/
+
+# 3. Request Checkpoints (Linear Middleware Gates)
+php srin make:checkpoint VerifySubscription # Scaffolds Checkpoint/VerifySubscriptionCheckpoint.php
+
+# 4. Database Models & Migrations
 php srin make:model Post -m          # Create Model/Post.php AND a migration
 php srin make:model Inquiry          # Create Model/Inquiry.php only
 php srin make:migration add_views    # Create a new migration file
@@ -317,27 +332,24 @@ php srin migrate:rollback            # Rollback the last migration batch
 php srin migrate:status              # Show migration status table
 php srin migrate:fresh               # Drop all tables and re-run migrations
 
-# 3. Create a standard controller
+# 5. Create a standard controller
 php srin make:controller HomeController
 
-# 4. Create a controller with mail transfer
+# 6. Create a controller with mail transfer
 php srin make:controller ContactController --mail
 
-# 5. Create a new frontend page (.srin.php)
+# 7. Create a new frontend page (.srin.php)
 php srin make:page portfolio
 
-# 6. Create a master layout
+# 8. Create a master layout
 php srin make:layout admin
 
-# 7. Create a custom error page (e.g., 403, 404, 500)
+# 9. Create a custom error page (e.g., 403, 404, 500)
 php srin make:error 404
 php srin make:error 500
 
-# 8. List all registered routes
+# 10. List all registered routes
 php srin routes
-
-# 9. Clear development mail logs
-php srin clear:logs
 ```
 
 ---
@@ -843,42 +855,43 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 @include('components.card', ['title' => 'Fast API', 'desc' => 'Lightweight PHP'])
 ```
 
-### 4. Complete Shortcode & Template Directive Reference (Cheat Sheet)
+### 4. Complete Srin Tags & Directives Reference (Cheat Sheet)
 
-| Category | Shortcode / Directive | Example Syntax | Purpose |
+| Category | Srin Tag / Directive | Example Syntax | Purpose |
 | :--- | :--- | :--- | :--- |
-| **Layouts** | `@Connect('layout')` | `@Connect('layouts/main')` | Connect page to a master layout in `Pages/layouts/` |
-| | `@title('Page Title')` | `@title('My Profile')` | Set the HTML page title variable `$title` |
-| | `@content('slot', 'fallback')` | `@content('header')` | Declare named injection slot in master layout |
-| | `@content` | `@content` | Main page body placeholder in master layout |
-| | `@contentConnect('slot')` | `@contentConnect('header') ... @endContentConnect` | Define section block to slot into layout |
-| | `@connectContent('slot')` | `@connectContent('main') ... @endconnectContent` | Alias for `@contentConnect` (word-order flexible) |
-| | `@contentCconnect('slot')` | `@contentCconnect('footer') ... @endContentCconnect` | Alias with double-C spelling |
-| **Partials** | `@include('path.file')` | `@include('partials.navbar')` | Include reusable partial template (dot-notation) |
-| | `@include('path', $data)` | `@include('components.card', ['title' => 'Pro'])` | Include partial with custom scoped data |
-| **UI Controls** | `@paginate($paginator)` | `@paginate($articles)` | Render responsive HTML pagination with pill links |
+| **Layouts** | `[layout 'name']` | `[layout 'layouts/main']` | Connect page to a master layout in `Pages/layouts/` |
+| | `[title 'Page Title']` | `[title 'My Profile']` | Set the HTML page title variable `$title` |
+| | `[slot 'name', 'fallback']` | `[slot 'header']` | Declare named injection slot in master layout |
+| | `[slot]` | `[slot]` | Main page body placeholder in master layout |
+| | `[block 'name'] ... [end]` | `[block 'scripts'] ... [end]` | Inject custom section or assets into layout slot |
+| **Partials** | `[include 'path.file']` | `[include 'partials/navbar']` | Include reusable partial template (dot or slash path) |
+| | `[include 'path', $data]` | `[include 'components/card', ['title' => 'Pro']]` | Include partial with custom scoped data |
+| **Control Flow** | `[if condition] ... [end]` | `[if $user] ... [end]` | Conditional branching |
+| | `[elseif condition]` | `[elseif $guest]` | Else-if condition branch |
+| | `[else]` | `[else]` | Fallback branch |
+| | `[unless condition]` | `[unless $isSubscribed] ... [end]` | Inverted condition (`if (!condition)`) |
+| | `[isset $var]` | `[isset $account->bio] ... [end]` | Variable existence check |
+| | `[empty $var]` | `[empty $posts] ... [end]` | Variable emptiness check |
+| | `[each $items as $item]` | `[each $posts as $p] ... [end]` | Iterate over arrays, models, or collections |
+| | `[empty]` | `[each $p as $i] ... [empty] ... [end]` | Fallback when collection is empty (no forelse needed!) |
+| | `[for ...]` | `[for $i = 1; $i <= 5; $i++] ... [end]` | Standard numeric loop |
+| | `[while condition]` | `[while $hasMore] ... [end]` | Standard while loop |
+| **UI Controls** | `[paginate $paginator]` | `[paginate $articles]` | Render responsive HTML pagination with pill links |
 | | `@flash('key')` | `@flash('success')` | Render session flash alert banner if set |
-| **Security** | `@csrf` | `<form>@csrf</form>` | Inject hidden CSRF protection token input |
-| | `@honeypot` | `<form>@honeypot</form>` | Inject invisible spam-bot trap field |
+| **Security** | `[csrf]` | `<form>[csrf]</form>` | Inject hidden CSRF protection token input |
+| | `[honeypot]` | `<form>[honeypot]</form>` | Inject invisible spam-bot trap field |
 | | `{{ $expression }}` | `<h1>{{ $article->title }}</h1>` | Auto-escaped XSS-safe variable printing |
 | | `{!! $trustedHtml !!}` | `<div>{!! $post->content !!}</div>` | Raw unescaped HTML printing for rich text |
 | | `{{-- comment --}}` | `{{-- Secret dev note --}}` | Server-side comment (omitted from browser source) |
 | | `@{{ jsVariable }}` | `<span>@{{ vueCount }}</span>` | Escape braces for Vue / Alpine / React |
-| **Control Flow**| `@if / @elseif / @else` | `@if($count > 0) ... @endif` | Conditional branching |
-| | `@unless(condition)` | `@unless($isSubscribed) ... @endunless` | Inverted condition (`if (!condition)`) |
-| | `@isset($variable)` | `@isset($user->bio) ... @endisset` | Variable existence check |
-| | `@empty($variable)` | `@empty($posts) ... @endempty` | Empty check on arrays or variables |
-| | `@foreach($items as $item)` | `@foreach($articles as $a) ... @endforeach` | Iterate over arrays, models, or paginators |
-| | `@for(...)` | `@for($i = 1; $i <= 5; $i++) ... @endfor` | Standard numeric loop |
-| | `@while(condition)` | `@while($hasMore) ... @endwhile` | Standard while loop |
 | **Helpers** | `{{assets('/path')}}` | `<link href="{{assets('/css/app.css')}}">` | Absolute path to `assets/` (subfolder safe) |
 | | `{{route('name', $params)}}` | `<a href="{{route('blog.show', ['slug' => 'hi'])}}">` | Generate URL for named route |
 | | `{{url('/path')}}` | `<a href="{{url('/contact')}}">Contact</a>` | Application URL with subfolder auto-detection |
 | | `{{config('key', 'default')}}` | `<title>{{ config('name') }}</title>` | Read application configuration |
 | | `{{old('field')}}` | `<input value="{{ old('email') }}">` | Repopulate input after validation error |
-| | `is_home()` | `@unless(is_home()) ... @endunless` | Check if current page is the homepage |
-| | `is_route('name')` | `@if(is_route('contact')) ... @endif` | Check current route name (supports wildcards) |
-| | `request_uri()` | `@if(request_uri() !== '/') ... @endif` | Get clean relative request path |
+| | `is_home()` | `[unless is_home()] ... [end]` | Check if current page is the homepage |
+| | `is_route('name')` | `[if is_route('contact')] ... [end]` | Check current route name (supports wildcards) |
+| | `request_uri()` | `[if request_uri() !== '/'] ... [end]` | Get clean relative request path |
 
 ---
 
@@ -954,6 +967,270 @@ Configured in `Config/mail.php` with `.env` support:
 ```bash
 php srin make:controller ContactController --mail
 ```
+
+---
+
+## 📜 Application Logging & Terminal Inspection
+
+Srin Engine features a lightweight, zero-dependency logging engine (`Core\Log`) with automatic uncaught exception capture and a dedicated terminal log viewer.
+
+### 1. Where Log Files Are Saved
+All application and service logs are stored inside the `Others/logs/` directory:
+
+| Log File | Exact Path | Description |
+| :--- | :--- | :--- |
+| **Application Log** | `Others/logs/srin.log` | Uncaught server exceptions, system errors, database warnings, and custom messages logged via `Core\Log`. |
+| **Mail Dispatch Log** | `Others/logs/mail.log` | Outgoing emails captured in local development when `MAIL_DRIVER=log` is set in `.env`. |
+
+### 2. How to Check & Tail Logs via Terminal
+
+#### Option A: Using the Srin CLI (`php srin logs`)
+Srin includes a dedicated terminal log viewer with ANSI color highlights (`ERROR` in red, `WARNING` in yellow, `INFO` in green, and `DEBUG` in cyan):
+
+```bash
+# 1. View the latest application logs (default: last 25 lines)
+php srin logs
+
+# 2. Live streaming / tailing in real-time (auto-updates as logs arrive; press Ctrl+C to exit)
+php srin logs -f
+# Or:
+php srin logs --tail
+
+# 3. View a custom number of lines
+php srin logs --lines=50
+
+# 4. Inspect outgoing mail delivery logs
+php srin logs --mail
+
+# 5. Clear / truncate all log files in Others/logs/
+php srin clear:logs
+# Or:
+php srin logs --clear
+```
+
+#### Option B: Using Native System Terminals
+You can also inspect or live-stream logs directly using your operating system's native terminal commands:
+
+**Windows PowerShell:**
+```powershell
+# Live stream / tail the application log with PowerShell:
+Get-Content Others/logs/srin.log -Wait -Tail 30
+
+# View the last 50 lines:
+Get-Content Others/logs/srin.log -Tail 50
+```
+
+**Linux / macOS / Git Bash:**
+```bash
+# Live tail the application log:
+tail -f Others/logs/srin.log
+
+# View the last 100 lines:
+tail -n 100 Others/logs/srin.log
+```
+
+### 3. Writing Logs in PHP Code (`Core\Log`)
+Log messages from any controller, model, or checkpoint using `Core\Log` or global helpers:
+
+```php
+use Core\Log;
+
+// Using the static Log class:
+Log::info('New account registered', ['account_id' => $account->id]);
+Log::warning('Rate limit nearing threshold', ['ip' => request_ip()]);
+Log::error('Payment processing failed', ['gateway' => 'stripe', 'code' => 504]);
+Log::debug('SQL Query execution trace', ['time' => '1.2ms']); // Only recorded when APP_DEBUG=true
+
+// Or using global helper shortcuts:
+log_info('Order placed', ['order_id' => 1042]);
+log_error('External API failed to respond');
+log_warning('Unusual activity detected');
+log_debug('Benchmark profile');
+```
+
+---
+
+## 🛡️ Request Checkpoints (Linear Middleware Gates)
+
+Instead of the convoluted, nested closure pipeline used in traditional frameworks (Laravel's onion middleware), Srin Engine introduces **Checkpoints**—a clean, linear request verification gate architecture.
+
+### 1. The Checkpoint Lifecycle
+Each checkpoint implements `enter(Request $request)` to validate incoming requests, and optionally `leave(Request $request)` to inspect the outgoing response:
+
+```php
+<?php
+
+namespace Checkpoint;
+
+use Core\Checkpoint;
+use Core\Request;
+
+class VerifySubscriptionCheckpoint extends Checkpoint
+{
+    public function enter(Request $request): void
+    {
+        if (!auth_check() || !auth_account()->is_subscribed) {
+            flash('error', 'An active subscription is required to view this area.');
+            redirect(route('billing.plans'));
+        }
+    }
+}
+```
+
+### 2. Built-In Checkpoints
+Srin Engine ships with three core checkpoints pre-registered in `Config/auth.php`:
+
+| Checkpoint Alias | Class | Behavior |
+| :--- | :--- | :--- |
+| `'auth'` | `Checkpoint\AuthCheckpoint` | Requires visitor to be authenticated. Redirects guests to the login page. |
+| `'guest'` | `Checkpoint\GuestCheckpoint` | Requires visitor to be a guest. Redirects logged-in accounts to the dashboard. |
+| `'admin'` | `Checkpoint\AdminCheckpoint` | Requires an authenticated account with administrator rights. Aborts with HTTP 403 Forbidden if unauthorized. |
+
+### 3. Registering Checkpoints on Routes
+Attach checkpoints to individual routes or bundle them into groups:
+
+```php
+use Core\Router;
+
+// Single checkpoint
+Router::get('/dashboard', 'DashboardController@index', 'dashboard')
+    ->checkpoint('auth');
+
+// Multiple checkpoints in sequence
+Router::get('/admin/analytics', 'AdminController@analytics', 'admin.analytics')
+    ->checkpoint(['auth', 'admin']);
+
+// Route Group with Checkpoint and Prefix
+Router::group(['prefix' => '/portal', 'checkpoint' => 'auth'], function () {
+    Router::get('/', 'PortalController@index', 'portal.home');
+    Router::get('/billing', 'PortalController@billing', 'portal.billing');
+});
+```
+
+### 4. Scaffolding Checkpoints via CLI
+```bash
+php srin make:checkpoint VerifySubscription
+```
+
+---
+
+## 🔐 Universal Authentication & Identity (`Core\Auth` & `Model\Account`)
+
+Srin Engine includes an enterprise-grade, zero-dependency authentication manager (`Core\Auth`) with native password hashing, session fixation defense, and dynamic account models.
+
+### 1. Configuration (`Config/auth.php`)
+```php
+return [
+    'model' => Model\Account::class,
+    'session_key' => 'srin_auth_account_id',
+    'login_route' => 'auth.login',
+    'checkpoints' => [
+        'auth'  => Checkpoint\AuthCheckpoint::class,
+        'guest' => Checkpoint\GuestCheckpoint::class,
+        'admin' => Checkpoint\AdminCheckpoint::class,
+    ],
+];
+```
+
+### 2. Authenticating in Controllers
+```php
+namespace Controller;
+
+use Core\BaseController;
+use Core\Auth;
+use Model\Account;
+
+class AuthController extends BaseController
+{
+    public function login()
+    {
+        $data = $this->guard([
+            'email'    => 'required|email',
+            'password' => 'required',
+        ]);
+
+        // Attempt authentication (verifies password using password_verify)
+        if (Auth::attempt($data['email'], $data['password'])) {
+            // Automatically regenerates session ID to prevent session fixation attacks
+            return $this->success('Welcome back, ' . Auth::user()->name . '!')
+                ->go('dashboard');
+        }
+
+        return $this->fail('Invalid email or password.')->back();
+    }
+
+    public function logout()
+    {
+        Auth::logout();
+        return $this->success('You have been signed out.')->go('home');
+    }
+}
+```
+
+### 3. Global Auth Helpers
+Use these helpers anywhere in controllers, checkpoints, or templates:
+- `auth()` &rarr; Returns the authenticated `Model\Account` instance, or `null`.
+- `auth_check()` &rarr; Returns boolean `true` if logged in, `false` otherwise.
+- `auth_id()` &rarr; Returns primary key ID of the logged-in account.
+- `auth_account()` &rarr; Returns the account model instance.
+
+---
+
+## 📁 Native HTTP File & Image Uploads
+
+Srin Engine provides native, safe file and image upload management right through `Core\Request` and `Core\BaseController` without any external dependencies.
+
+### 1. Upload Form Markup
+```html
+<form action="{{ route('account.avatar') }}" method="POST" enctype="multipart/form-data">
+    [csrf]
+    [honeypot]
+    <input type="file" name="avatar" accept="image/*" required>
+    <button type="submit">Upload Avatar</button>
+</form>
+```
+
+### 2. Processing Uploads in Controllers
+```php
+namespace Controller;
+
+use Core\BaseController;
+
+class AccountController extends BaseController
+{
+    public function uploadAvatar()
+    {
+        $this->validateCsrf();
+
+        // 1. Verify valid upload exists (checks UPLOAD_ERR_OK and non-empty tmp_name)
+        if (!$this->hasFile('avatar')) {
+            return $this->fail('Please select a file to upload.')->back();
+        }
+
+        // 2. Inspect file metadata
+        $fileInfo = $this->file('avatar'); // ['name' => ..., 'type' => ..., 'size' => ...]
+
+        // 3. Store file safely: enforces extension whitelist, generates cryptographic filename
+        $savedPath = $this->storeFile('avatar', 'assets/uploads/avatars', ['jpg', 'jpeg', 'png', 'webp']);
+
+        if (!$savedPath) {
+            return $this->fail('Invalid file format. Only JPG, PNG, and WebP images are allowed.')->back();
+        }
+
+        // Update account record
+        $account = auth_account();
+        $account->avatar = $savedPath;
+        $account->save();
+
+        return $this->success('Profile avatar updated!')->back();
+    }
+}
+```
+
+### 3. Three-Tier Security Guarantee
+- **Error Code Verification:** `hasFile()` ensures `$_FILES['key']['error'] === UPLOAD_ERR_OK` and verifies `tmp_name` is non-empty, preventing empty-upload bypasses.
+- **Cryptographic Filename Hashing:** `storeFile()` generates `bin2hex(random_bytes(16))` filenames, completely defeating directory traversal (e.g. `../../etc/passwd`) and double-extension attacks (e.g. `malicious.php.jpg`).
+- **Strict Extension Whitelisting:** Passing permitted extensions (e.g. `['jpg', 'png', 'webp']`) strictly verifies the extension before moving the temporary file to permanent storage.
 
 ---
 

@@ -33,3 +33,4 @@ return [
     // Fallback home URL
     'home_url' => '/',
 ];
+

@@ -71,3 +71,4 @@ class Account extends Model
         return strtoupper(substr($name, 0, 1));
     }
 }
+

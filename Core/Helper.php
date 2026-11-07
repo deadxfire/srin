@@ -659,6 +659,46 @@ if (!function_exists('auth_user')) {
     }
 }
 
+if (!function_exists('log_info')) {
+    /**
+     * Write an info message to Others/logs/srin.log.
+     */
+    function log_info(string $message, array $context = []): void
+    {
+        \Core\Log::info($message, $context);
+    }
+}
+
+if (!function_exists('log_error')) {
+    /**
+     * Write an error message to Others/logs/srin.log.
+     */
+    function log_error(string $message, array $context = []): void
+    {
+        \Core\Log::error($message, $context);
+    }
+}
+
+if (!function_exists('log_warning')) {
+    /**
+     * Write a warning message to Others/logs/srin.log.
+     */
+    function log_warning(string $message, array $context = []): void
+    {
+        \Core\Log::warning($message, $context);
+    }
+}
+
+if (!function_exists('log_debug')) {
+    /**
+     * Write a debug message to Others/logs/srin.log.
+     */
+    function log_debug(string $message, array $context = []): void
+    {
+        \Core\Log::debug($message, $context);
+    }
+}
+
 
 
 
