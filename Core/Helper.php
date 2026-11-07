@@ -577,6 +577,38 @@ if (!function_exists('request_path')) {
     }
 }
 
+if (!function_exists('srin')) {
+    /**
+     * Access the Srin Igniter engine or resolve a service from the dynamic container.
+     *
+     * Examples:
+     *   srin('mailer')             => resolves 'mailer' service from container
+     *   srin()->elapsed()          => "1.85 ms"
+     *   srin()->memory()           => "2.10 MB"
+     *   srin()->bench()            => performance benchmark array
+     *   srin()->bind('key', $fn)   => dynamic service binding
+     *   srin()->on('boot', $fn)    => dynamic lifecycle event hook
+     */
+    function srin(?string $service = null, mixed ...$params): mixed
+    {
+        if ($service !== null) {
+            return \Core\Igniter::make($service, $params);
+        }
+
+        static $proxy = null;
+        if ($proxy === null) {
+            $proxy = new class {
+                public function __call(string $method, array $args): mixed
+                {
+                    return \Core\Igniter::$method(...$args);
+                }
+            };
+        }
+
+        return $proxy;
+    }
+}
+
 
 
 

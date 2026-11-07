@@ -62,69 +62,17 @@ class App
     }
 
     /**
-     * Run the application.
+     * Run the application via the fast dynamic Igniter lifecycle engine.
      */
     public static function run(): void
     {
-        // 1. Automatically load .env environment variables
-        self::loadEnv();
-
-        // 2. Send Security Headers (Clickjacking, MIME-sniffing, XSS, Referrer protection)
-        if (!headers_sent()) {
-            header('X-Content-Type-Options: nosniff');
-            header('X-Frame-Options: SAMEORIGIN');
-            header('X-XSS-Protection: 1; mode=block');
-            header('Referrer-Policy: strict-origin-when-cross-origin');
-            header_remove('X-Powered-By');
-        }
-
-        // 3. Harden & Start Session
-        if (session_status() === PHP_SESSION_NONE) {
-            ini_set('session.cookie_httponly', '1');
-            ini_set('session.use_only_cookies', '1');
-            if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
-                ini_set('session.cookie_secure', '1');
-            }
-            session_start();
-        }
-
-        // 4. Register class alias for BaseController so controllers can extend BaseController directly
-        if (!class_exists('Controller\BaseController', false)) {
-            class_alias(\Core\BaseController::class, 'Controller\BaseController');
-        }
-
-        // 5. Set timezone
-        date_default_timezone_set(config('app.timezone', 'UTC'));
-
-        // 6. Configure error reporting
-        $isDebug = (bool) config('app.debug', true);
-        if ($isDebug) {
-            ini_set('display_errors', '1');
-            ini_set('display_startup_errors', '1');
-            error_reporting(E_ALL);
-        } else {
-            ini_set('display_errors', '0');
-            error_reporting(0);
-        }
-
-        try {
-            // 7. Load routes
-            $routesFile = dirname(__DIR__) . '/Routes/web.php';
-            if (file_exists($routesFile)) {
-                require_once $routesFile;
-            }
-
-            // 8. Dispatch Router
-            Router::dispatch();
-        } catch (Throwable $e) {
-            self::handleException($e, $isDebug);
-        }
+        Igniter::start();
     }
 
     /**
      * Handle uncaught exceptions cleanly.
      */
-    protected static function handleException(Throwable $e, bool $isDebug): void
+    public static function handleException(Throwable $e, bool $isDebug): void
     {
         Response::status(500);
 

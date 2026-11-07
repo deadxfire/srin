@@ -63,5 +63,5 @@ if (file_exists($composerAutoload)) {
     }
 }
 
-// 2. Run the application
-\Core\App::run();
+// 2. Fast Dynamic Startup via Srin Igniter
+\Core\Igniter::start();
