@@ -380,6 +380,113 @@ class BaseController
     }
 
     /**
+     * Srin Action Guard - All-in-one defense, validation, and safe data extraction.
+     * Automatically verifies CSRF and Honeypot on POST/PUT/DELETE, sanitizes inputs,
+     * and redirects back with flashed errors on validation failure.
+     *
+     * Example:
+     *   $data = $this->guard([
+     *       'title'   => 'required|min:5|max:200',
+     *       'slug'    => ['required', 'min:3'],
+     *       'content' => 'required|min:20',
+     *       'summary', 'price', 'is_published' // optional whitelisted fields
+     *   ]);
+     */
+    protected function guard(array $schema, ?string $throttleKey = null, int $maxAttempts = 5, int $decaySeconds = 60): array
+    {
+        // 1. Optional rate limiting
+        if ($throttleKey !== null) {
+            $this->rateLimit($throttleKey, $maxAttempts, $decaySeconds);
+        }
+
+        // 2. Automated security verification on mutations
+        if ($this->isPost()) {
+            $this->validateCsrf();
+            $this->validateHoneypot();
+        }
+
+        // 3. Separate whitelist keys from validation rules
+        $rules = [];
+        $allowedKeys = [];
+
+        foreach ($schema as $key => $rule) {
+            if (is_int($key)) {
+                // Positional string: 'summary', 'price'
+                $allowedKeys[] = $rule;
+            } else {
+                // Associative: 'title' => 'required|min:5' or 'slug' => ['required', 'min:3']
+                $allowedKeys[] = $key;
+                $rules[$key] = is_array($rule) ? implode('|', $rule) : (string) $rule;
+            }
+        }
+
+        // 4. Extract only allowed inputs (mass-assignment protection)
+        $data = $this->onlyInputs($allowedKeys);
+
+        // 5. Run validation if rules exist
+        if (!empty($rules)) {
+            $errors = $this->validate($data, $rules);
+            if (!empty($errors)) {
+                if (function_exists('flash_inputs')) {
+                    flash_inputs($data);
+                }
+                $firstError = reset($errors);
+                $this->flash('errors', is_array($errors) ? implode(' ', $errors) : (string) $errors);
+                $this->flash('error', (string) $firstError);
+                $this->back();
+                exit;
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * Enforce CSRF token and anti-bot Honeypot verification simultaneously.
+     */
+    protected function secure(): void
+    {
+        $this->validateCsrf();
+        $this->validateHoneypot();
+    }
+
+    /**
+     * Expressive success flash shortcut.
+     * Example: return $this->success('Saved!')->go('articles.index');
+     */
+    protected function success(string $message): self
+    {
+        return $this->flashSuccess($message);
+    }
+
+    /**
+     * Expressive error flash shortcut.
+     * Example: return $this->fail('Invalid submission')->back();
+     */
+    protected function fail(string $message): self
+    {
+        return $this->flashError($message);
+    }
+
+    /**
+     * Expressive route redirect shortcut.
+     * Example: return $this->success('Done')->go('articles.show', ['slug' => $slug]);
+     */
+    protected function go(string $name, array|string|int $params = [], int $statusCode = 302): void
+    {
+        $this->redirectToRoute($name, $params, $statusCode);
+    }
+
+    /**
+     * Expressive JSON API responder.
+     * Example: $this->respond(['status' => 'ok', 'data' => $items]);
+     */
+    protected function respond(mixed $data, int $statusCode = 200): void
+    {
+        $this->json($data, $statusCode);
+    }
+
+    /**
      * Abort request with an HTTP error code.
      * Automatically renders Pages/errors/{code}.srin.php if present.
      */

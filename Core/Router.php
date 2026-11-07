@@ -96,43 +96,64 @@ class Router
     protected static mixed $fallbackHandler = null;
 
     /**
-     * Register a GET route.
+     * Register a GET route with optional direct route name.
+     * Example: Router::get('/articles', 'ArticleController@index', 'articles.index');
      */
-    public static function get(string $path, mixed $handler): Route
+    public static function get(string $path, mixed $handler, ?string $name = null): Route
     {
-        return self::addRoute('GET', $path, $handler);
+        $route = self::addRoute('GET', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
     }
 
     /**
-     * Register a POST route.
+     * Register a POST route with optional direct route name.
      */
-    public static function post(string $path, mixed $handler): Route
+    public static function post(string $path, mixed $handler, ?string $name = null): Route
     {
-        return self::addRoute('POST', $path, $handler);
+        $route = self::addRoute('POST', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
     }
 
     /**
-     * Register a PUT route.
+     * Register a PUT route with optional direct route name.
      */
-    public static function put(string $path, mixed $handler): Route
+    public static function put(string $path, mixed $handler, ?string $name = null): Route
     {
-        return self::addRoute('PUT', $path, $handler);
+        $route = self::addRoute('PUT', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
     }
 
     /**
-     * Register a DELETE route.
+     * Register a DELETE route with optional direct route name.
      */
-    public static function delete(string $path, mixed $handler): Route
+    public static function delete(string $path, mixed $handler, ?string $name = null): Route
     {
-        return self::addRoute('DELETE', $path, $handler);
+        $route = self::addRoute('DELETE', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
     }
 
     /**
-     * Register a route responding to any HTTP method.
+     * Register a route responding to any HTTP method with optional direct route name.
      */
-    public static function any(string $path, mixed $handler): Route
+    public static function any(string $path, mixed $handler, ?string $name = null): Route
     {
-        return self::addRoute('*', $path, $handler);
+        $route = self::addRoute('*', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
     }
 
     /**

@@ -264,11 +264,134 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * Forward any static calls directly to a new QueryBuilder instance.
+     * Forward any static calls directly to a new QueryBuilder instance or static handler.
      */
     public static function __callStatic(string $method, array $parameters): mixed
     {
+        if ($method === 'remove') {
+            return static::destroy($parameters[0] ?? null);
+        }
+
         return static::query()->$method(...$parameters);
+    }
+
+    /**
+     * Start a new query on the model's table with optional associative criteria.
+     * Unique Srin fetcher replacing verbose where chaining.
+     *
+     * Example:
+     *   Post::fetch(['is_published' => true, 'category' => 'tech'])->latest()->get();
+     */
+    public static function fetch(array $criteria = []): QueryBuilder
+    {
+        $q = static::query();
+        foreach ($criteria as $column => $value) {
+            $q->where($column, $value);
+        }
+        return $q;
+    }
+
+    /**
+     * Retrieve a single record matching criteria or automatically render 404.
+     * Unique Srin method replacing findOrFail / firstOrFail.
+     *
+     * Example:
+     *   $post = Post::one(['slug' => $slug]);
+     *   $post = Post::one($id);
+     */
+    public static function one(array|int|string $criteria): static
+    {
+        if (is_int($criteria) || (is_string($criteria) && ctype_digit($criteria))) {
+            return static::pick((int) $criteria);
+        }
+
+        if (is_string($criteria)) {
+            $criteria = ['slug' => $criteria];
+        }
+
+        $record = static::fetch($criteria)->first();
+        if (!$record) {
+            Response::renderError(404, 'The requested ' . (new \ReflectionClass(static::class))->getShortName() . ' was not found.');
+            exit;
+        }
+
+        return $record;
+    }
+
+    /**
+     * Pick a single model by primary key or automatically render 404.
+     * Expressive Srin alternative to findOrFail().
+     */
+    public static function pick(int|string $id): static
+    {
+        return static::findOrFail($id);
+    }
+
+    /**
+     * Insert and persist a new model instance.
+     * Expressive Srin alternative to create().
+     */
+    public static function insert(array $attributes): static
+    {
+        return static::create($attributes);
+    }
+
+    /**
+     * Modify an existing record by ID or criteria.
+     *
+     * Example:
+     *   Post::modify($id, ['title' => 'Updated']);
+     */
+    public static function modify(int|string|array $idOrCriteria, array $attributes): bool
+    {
+        if (is_array($idOrCriteria)) {
+            return static::fetch($idOrCriteria)->update($attributes) >= 0;
+        }
+
+        $record = static::find($idOrCriteria);
+        if (!$record) {
+            return false;
+        }
+
+        return $record->update($attributes);
+    }
+
+    /**
+     * Remove the current model instance from the database.
+     * Expressive Srin alternative to delete().
+     */
+    public function remove(): bool
+    {
+        return $this->delete();
+    }
+
+    /**
+     * Increment a numeric counter column and save immediately.
+     * Example: $article->hit('views');
+     */
+    public function hit(string $column = 'views', int $amount = 1): bool
+    {
+        $current = (int) ($this->attributes[$column] ?? 0);
+        $this->attributes[$column] = $current + $amount;
+        return $this->save();
+    }
+
+    /**
+     * Paginate records directly with optional filter criteria.
+     * Example: Post::page(10, ['is_published' => true]);
+     */
+    public static function page(int $perPage = 15, array $criteria = []): Paginator
+    {
+        return static::fetch($criteria)->paginate($perPage);
+    }
+
+    /**
+     * Retrieve distinct non-empty values for a column with optional criteria.
+     * Example: Post::values('category', ['is_published' => true]);
+     */
+    public static function values(string $column, array $criteria = []): array
+    {
+        return static::fetch($criteria)->distinctValues($column);
     }
 
     /**
