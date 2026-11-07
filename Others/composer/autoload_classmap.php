@@ -14,6 +14,7 @@ return array(
     'Core\\Response' => $baseDir . '/Core/Response.php',
     'Core\\Route' => $baseDir . '/Core/Route.php',
     'Core\\Router' => $baseDir . '/Core/Router.php',
+    'Core\\Security' => $baseDir . '/Core/Security.php',
     'Core\\View' => $baseDir . '/Core/View.php',
     'PHPMailer\\PHPMailer\\DSNConfigurator' => $vendorDir . '/phpmailer/phpmailer/src/DSNConfigurator.php',
     'PHPMailer\\PHPMailer\\Exception' => $vendorDir . '/phpmailer/phpmailer/src/Exception.php',

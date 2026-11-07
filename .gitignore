@@ -1,10 +1,13 @@
 # Environment variables
 .env
 
+# Database
+database/*.sqlite
+database/*.sqlite-journal
+
 # Mail logs
 Others/logs/*.log
 
 # IDE files
 .vscode/
 .idea/
-

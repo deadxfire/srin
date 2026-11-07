@@ -31,7 +31,8 @@
         "psr-4": {
             "Controller\\": "Controller/",
             "Core\\": "Core/",
-            "Config\\": "Config/"
+            "Config\\": "Config/",
+            "Model\\": "Model/"
         },
         "files": [
             "Core/Helper.php"

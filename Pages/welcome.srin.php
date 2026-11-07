@@ -133,14 +133,15 @@
                             <li><a href="#assets-guide">2. Asset Linking</a></li>
                             <li><a href="#folder-structure">3. Folder Structure</a></li>
                             <li><a href="#srin-cli">4. CLI Commands (srin)</a></li>
-                            <li><a href="#controllers">5. Controllers</a></li>
-                            <li><a href="#templates">6. .srin.php &amp; @Connect</a></li>
-                            <li><a href="#routing">7. Defining Routes</a></li>
-                            <li><a href="#mail-transfer">8. Mail Transfer</a></li>
-                            <li><a href="#composer">9. Composer &amp; Download</a></li>
-                            <li><a href="#error-pages">10. Custom Error Pages</a></li>
-                            <li><a href="#security">11. Security &amp; Downloads</a></li>
-                            <li><a href="#helpers">12. Global Helpers</a></li>
+                            <li><a href="#database-models">5. Models &amp; Migrations</a></li>
+                            <li><a href="#controllers">6. Controllers</a></li>
+                            <li><a href="#templates">7. .srin.php &amp; @Connect</a></li>
+                            <li><a href="#routing">8. Defining Routes</a></li>
+                            <li><a href="#mail-transfer">9. Mail Transfer</a></li>
+                            <li><a href="#composer">10. Composer &amp; Download</a></li>
+                            <li><a href="#error-pages">11. Custom Error Pages</a></li>
+                            <li><a href="#security">12. Security &amp; Downloads</a></li>
+                            <li><a href="#helpers">13. Global Helpers</a></li>
                         </ul>
                     </div>
                 </aside>
@@ -227,12 +228,20 @@ assets/images/banner.jpg</code></pre>
                                 <p>All your custom controllers live here. Extend <code>BaseController</code> to access <code>render()</code>, <code>json()</code>, <code>redirect()</code>, and <code>validate()</code>.</p>
                             </div>
                             <div class="structure-item">
+                                <strong>Model/</strong>
+                                <p>ActiveRecord database models live here. Extend <code>Core\Model</code> to access automatic plural tables, fillable mass-assignment protection, and fluent querying.</p>
+                            </div>
+                            <div class="structure-item">
+                                <strong>database/migrations/</strong>
+                                <p>All schema migration blueprints live here. Define schema with <code>Core\Blueprint</code> and execute via <code>php srin migrate</code>.</p>
+                            </div>
+                            <div class="structure-item">
                                 <strong>Core/</strong>
-                                <p>Srin engine core: <code>App</code>, <code>Router</code>, <code>Request</code>, <code>Response</code>, <code>View</code>, <code>Mailer</code>, and <code>Helper</code>.</p>
+                                <p>Srin engine core: <code>App</code>, <code>Model</code>, <code>Database</code>, <code>QueryBuilder</code>, <code>Schema</code>, <code>Blueprint</code>, <code>Migrator</code>, <code>Router</code>, <code>Request</code>, <code>Response</code>, <code>View</code>, <code>Mailer</code>, and <code>Helper</code>.</p>
                             </div>
                             <div class="structure-item">
                                 <strong>Config/</strong>
-                                <p>Configuration options (<code>app.php</code> as main config; <code>mail.php</code> for SMTP and mail drivers).</p>
+                                <p>Configuration options (<code>app.php</code> as main config, <code>database.php</code> for PDO SQLite/MySQL/PostgreSQL, <code>mail.php</code> for SMTP and mail drivers).</p>
                             </div>
                             <div class="structure-item">
                                 <strong>Pages/</strong>
@@ -252,7 +261,17 @@ assets/images/banner.jpg</code></pre>
                     <!-- 4. CLI Commands -->
                     <section id="srin-cli" class="doc-card">
                         <h2>4. Static CLI Commands (<code>php srin</code>)</h2>
-                        <p>Use the built-in Srin CLI tool (<code>srin</code> or <code>php srin</code>) to generate controllers, pages, layouts, and error pages:</p>
+                        <p>Use the built-in Srin CLI tool (<code>srin</code> or <code>php srin</code>) to generate models, migrations, controllers, pages, layouts, and error pages:</p>
+
+                        <h3>Generate Model with Migration</h3>
+                        <pre><code>php srin make:model Post -m</code></pre>
+                        <p>Generates <code>Model/Post.php</code> and a matching migration file in <code>database/migrations/</code>.</p>
+
+                        <h3>Database Migrations</h3>
+                        <pre><code>php srin migrate           # Run pending migrations
+php srin migrate:status    # View status of migrations
+php srin migrate:rollback  # Rollback last migration batch
+php srin migrate:fresh     # Drop all tables and re-run all migrations</code></pre>
 
                         <h3>Create a Standard Controller</h3>
                         <pre><code>php srin make:controller HomeController</code></pre>
@@ -280,9 +299,67 @@ assets/images/banner.jpg</code></pre>
                         <pre><code>php srin serve --port=8000</code></pre>
                     </section>
 
-                    <!-- 5. Controllers -->
+                    <!-- 5. Database Models & Migrations -->
+                    <section id="database-models" class="doc-card">
+                        <h2>5. Database Models &amp; Migrations (ActiveRecord)</h2>
+                        <p>Srin Engine features an expressive ActiveRecord ORM and multi-dialect schema migration engine. Zero-setup <strong>SQLite</strong> is pre-configured by default, with complete support for <strong>MySQL</strong> and <strong>PostgreSQL</strong> via <code>Config/database.php</code>.</p>
+
+                        <h3>1. Create a Model &amp; Migration:</h3>
+                        <pre><code>php srin make:model Article -m</code></pre>
+
+                        <h3>2. Define the Schema Blueprint:</h3>
+                        <pre><code>&lt;?php
+
+use Core\Migration;
+use Core\Schema;
+use Core\Blueprint;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('articles', function (Blueprint \$table) {
+            \$table-&gt;id();
+            \$table-&gt;string('title');
+            \$table-&gt;string('slug')-&gt;unique();
+            \$table-&gt;text('content')-&gt;nullable();
+            \$table-&gt;boolean('is_published')-&gt;default(true);
+            \$table-&gt;timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('articles');
+    }
+};</code></pre>
+
+                        <h3>3. Run Migrations:</h3>
+                        <pre><code>php srin migrate</code></pre>
+
+                        <h3>4. Query with the ActiveRecord Model:</h3>
+                        <pre><code>use Model\Article;
+
+// Create (mass-assignment protected by \$fillable)
+\$article = Article::create([
+    'title' =&gt; 'First Article',
+    'slug' =&gt; 'first-article',
+    'content' =&gt; 'Hello World from Srin Engine',
+]);
+
+// Find &amp; Query (PDO prepared statements prevent SQL injection)
+\$item = Article::find(1);
+\$published = Article::where('is_published', true)-&gt;latest()-&gt;get();
+
+// Update
+\$item-&gt;update(['title' =&gt; 'Updated Article Title']);
+
+// Delete
+\$item-&gt;delete();</code></pre>
+                    </section>
+
+                    <!-- 6. Controllers -->
                     <section id="controllers" class="doc-card">
-                        <h2>5. Writing Controllers</h2>
+                        <h2>6. Writing Controllers</h2>
                         <p>Controllers inherit useful helper methods from <code>BaseController</code>:</p>
                         <pre><code>&lt;?php
 
@@ -308,9 +385,9 @@ class PortfolioController extends BaseController
 }</code></pre>
                     </section>
 
-                    <!-- 6. Pages & Layouts -->
+                    <!-- 7. Pages & Layouts -->
                     <section id="templates" class="doc-card">
-                        <h2>6. <code>.srin.php</code> Templates, <code>&#123;&#123; &#125;&#125;</code> Syntax &amp; <code>@Connect</code></h2>
+                        <h2>7. <code>.srin.php</code> Templates, <code>&#123;&#123; &#125;&#125;</code> Syntax &amp; <code>@Connect</code></h2>
                         <div class="highlight-box">
                             <strong>Strict Template Format:</strong> All views, layouts, and partials in Srin Engine <strong>must use the <code>.srin.php</code> extension</strong> (e.g. <code>Pages/portfolio.srin.php</code>). Standard <code>.php</code> files (like <code>Pages/portfolio.php</code>) are intentionally rejected and will not work.
                         </div>
@@ -373,9 +450,9 @@ class PortfolioController extends BaseController
 &lt;/html&gt;</code></pre>
                     </section>
 
-                    <!-- 7. Defining Routes -->
+                    <!-- 8. Defining Routes -->
                     <section id="routing" class="doc-card">
-                        <h2>7. Defining Routes &amp; Named Links (<code>Routes/web.php</code>)</h2>
+                        <h2>8. Defining Routes &amp; Named Links (<code>Routes/web.php</code>)</h2>
                         <p>Register all link paths in <code>Routes/web.php</code> and assign names using <code>->name('name')</code>:</p>
                         <pre><code>use Core\Router;
 
@@ -407,9 +484,9 @@ Router::get('/portfolio/{slug}', 'PortfolioController@show')->name('portfolio.sh
 echo route('home');</code></pre>
                     </section>
 
-                    <!-- 8. Mail Transfer -->
+                    <!-- 9. Mail Transfer -->
                     <section id="mail-transfer" class="doc-card">
-                        <h2>8. Mail Transfer Feature</h2>
+                        <h2>9. Mail Transfer Feature</h2>
                         <p>The system provides a ready-to-use mailer in <code>Core\Mailer</code> with three drivers configurable in <code>Config/mail.php</code>:</p>
 
                         <ul class="feature-bullets">
@@ -431,22 +508,22 @@ Mailer::send([
 ]);</code></pre>
                     </section>
 
-                    <!-- 9. Composer Support & Automated Setup -->
+                    <!-- 10. Composer Support & Automated Setup -->
                     <section id="composer" class="doc-card">
-                        <h2>9. Composer Support &amp; Automated Download</h2>
+                        <h2>10. Composer Support &amp; Automated Download</h2>
                         <p>Srin is designed to be completely installable via Composer. Anyone on a new computer can run a single command to automatically download the entire engine, directory layout, and dependencies:</p>
 
                         <pre><code># Download and setup Srin on any new computer:
-composer create-project arindammakar/srin my-project</code></pre>
+composer create-project deadxfire/srin my-project</code></pre>
 
                         <p>Vendor packages are configured to install into <code>Others/</code> instead of <code>vendor/</code>, keeping your project root clean:</p>
                         <pre><code>composer require &lt;package-name&gt;</code></pre>
                         <p>All classes and packages installed in <code>Others/</code> are automatically autoloaded via <code>Others/autoload.php</code>.</p>
                     </section>
 
-                    <!-- 10. Custom Error Pages -->
+                    <!-- 11. Custom Error Pages -->
                     <section id="error-pages" class="doc-card">
-                        <h2>10. Custom Error Pages (<code>Pages/errors/</code>)</h2>
+                        <h2>11. Custom Error Pages (<code>Pages/errors/</code>)</h2>
                         <p>Srin automatically detects and sets your error page design by matching the HTTP error number with any template in <code>Pages/errors/{code}.srin.php</code>.</p>
 
                         <div class="highlight-box">
@@ -511,9 +588,9 @@ if (!isAuthorized()) {
                         </div>
                     </section>
 
-                    <!-- 11. Enterprise Security & Downloads -->
+                    <!-- 12. Enterprise Security & Downloads -->
                     <section id="security" class="doc-card">
-                        <h2>11. Enterprise Security &amp; Anti-Hacking Defenses</h2>
+                        <h2>12. Enterprise Security &amp; Anti-Hacking Defenses</h2>
                         <p>Srin Engine enforces a comprehensive, defense-in-depth security model to defeat common and advanced web attack vectors:</p>
 
                         <div class="highlight-box">
@@ -579,9 +656,9 @@ public function sendMail()
 }</code></pre>
                     </section>
 
-                    <!-- 12. Global Helpers -->
+                    <!-- 13. Global Helpers -->
                     <section id="helpers" class="doc-card">
-                        <h2>12. Useful Global Helpers</h2>
+                        <h2>13. Useful Global Helpers</h2>
                         <div class="helpers-table-wrapper">
                             <table class="helpers-table">
                                 <thead>

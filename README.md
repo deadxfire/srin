@@ -164,20 +164,35 @@ phpsystem/
 │
 ├── Config/                 # Application configuration
 │   ├── app.php             # Main configuration file (name, env, debug, developer, etc.)
+│   ├── database.php        # Database connection config (sqlite, mysql, pgsql)
 │   └── mail.php            # Mail driver (smtp, log, mail) and SMTP credentials
 │
 ├── Controller/             # Custom controllers (starts clean)
 │   └── .gitkeep            # Clean slate ready for your controllers
 │
+├── Model/                  # ActiveRecord database models
+│   └── .gitkeep            # Clean slate ready for your models
+│
+├── database/               # Database files & migrations
+│   └── migrations/         # Database migration blueprints
+│       └── .gitkeep
+│
 ├── Core/                   # Srin engine core logic
 │   ├── App.php             # Application bootstrap, .env loader & unified error handler
 │   ├── BaseController.php  # Base controller with render(), json(), redirect(), validate()
-│   ├── Router.php          # URL routing engine (GET, POST, named routes, closures)
+│   ├── Blueprint.php       # Schema column builder & multi-dialect SQL generator
+│   ├── Database.php        # Singleton PDO connection manager
+│   ├── Helper.php          # Global helpers: env(), view(), route(), config(), download(), asset()
+│   ├── Mailer.php          # Mail transfer service (SMTP / native mail / log driver)
+│   ├── Migration.php       # Base abstract migration class (up/down)
+│   ├── Migrator.php        # Database migration runner, rollback & status tracker
+│   ├── Model.php           # ActiveRecord base model (CRUD, timestamps, mass-assignment guard)
+│   ├── QueryBuilder.php    # SQL-injection-safe fluent query builder
 │   ├── Request.php         # HTTP request wrapper (inputs, sanitize, method, URI)
 │   ├── Response.php        # HTTP response, redirects, and secure asset downloads
-│   ├── View.php            # Strict .srin.php template renderer with @Connect
-│   ├── Mailer.php          # Mail transfer service (SMTP / native mail / log driver)
-│   └── Helper.php          # Global helpers: env(), view(), route(), config(), download(), asset()
+│   ├── Router.php          # URL routing engine (GET, POST, named routes, closures)
+│   ├── Schema.php          # Schema builder facade (create, drop, dropIfExists)
+│   └── View.php            # Strict .srin.php template renderer with @Connect
 │
 ├── Pages/                  # Frontend templates & layouts (.srin.php only)
 │   ├── errors/             # Custom error pages (e.g. 404.srin.php, 500.srin.php)
@@ -286,34 +301,264 @@ Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
 
 ## 🛠️ Srin CLI Generator Commands (`php srin`)
 
-Run `php srin` (or `php srin.php`) to generate controllers, pages, layouts, and error templates:
+Run `php srin` (or `php srin.php`) to generate controllers, models, migrations, pages, layouts, and error templates:
 
 ```bash
 # 1. Start development server
 php srin serve
 php srin serve --port=8080
 
-# 2. Create a standard controller
+# 2. Database Models & Migrations
+php srin make:model Post -m          # Create Model/Post.php AND a migration
+php srin make:model Inquiry          # Create Model/Inquiry.php only
+php srin make:migration add_views    # Create a new migration file
+php srin migrate                     # Run all pending migrations
+php srin migrate:rollback            # Rollback the last migration batch
+php srin migrate:status              # Show migration status table
+php srin migrate:fresh               # Drop all tables and re-run migrations
+
+# 3. Create a standard controller
 php srin make:controller HomeController
 
-# 3. Create a controller with mail transfer
+# 4. Create a controller with mail transfer
 php srin make:controller ContactController --mail
 
-# 4. Create a new frontend page (.srin.php)
+# 5. Create a new frontend page (.srin.php)
 php srin make:page portfolio
 
-# 5. Create a master layout
+# 6. Create a master layout
 php srin make:layout admin
 
-# 6. Create a custom error page (e.g., 403, 404, 500)
+# 7. Create a custom error page (e.g., 403, 404, 500)
 php srin make:error 404
 php srin make:error 500
 
-# 7. List all registered routes
+# 8. List all registered routes
 php srin routes
 
-# 8. Clear development mail logs
+# 9. Clear development mail logs
 php srin clear:logs
+```
+
+---
+
+## 🗄️ Database Models & Migrations (ActiveRecord)
+
+Srin Engine features a lightweight yet expressive **ActiveRecord ORM** and schema migration system inspired by modern frameworks. It works out-of-the-box with **SQLite** (zero setup required), and seamlessly connects to **MySQL / MariaDB** and **PostgreSQL**.
+
+### 1. Database Configuration (`Config/database.php`)
+
+Set your database driver and credentials in your `.env` file:
+
+```env
+# Default: Zero-configuration SQLite
+DB_CONNECTION=sqlite
+DB_DATABASE="database/database.sqlite"
+
+# Or MySQL / MariaDB:
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=srin_db
+# DB_USERNAME=root
+# DB_PASSWORD=secret
+# DB_CHARSET=utf8mb4
+
+# Or PostgreSQL:
+# DB_CONNECTION=pgsql
+# DB_HOST=127.0.0.1
+# DB_PORT=5432
+# DB_DATABASE=srin_db
+# DB_USERNAME=postgres
+# DB_PASSWORD=secret
+```
+
+### 2. Creating Models & Migrations
+
+Use `php srin make:model <Name> -m` to generate both the model and its corresponding table migration in one step:
+
+```bash
+php srin make:model Article -m
+```
+
+This generates:
+- `Model/Article.php` (namespaced under `Model\Article`, extending `Core\Model`)
+- `database/migrations/YYYY_MM_DD_HHMMSS_create_articles_table.php`
+
+### 3. Writing Migrations (`Core\Schema` & `Core\Blueprint`)
+
+Each migration file defines an `up()` method to create or alter tables, and a `down()` method to rollback:
+
+```php
+<?php
+
+use Core\Migration;
+use Core\Schema;
+use Core\Blueprint;
+
+return new class extends Migration {
+    public function up(): void
+    {
+        Schema::create('articles', function (Blueprint $table) {
+            $table->id();                                  // Auto-increment primary key
+            $table->string('title');                       // VARCHAR(255)
+            $table->string('slug')->unique();              // Unique column
+            $table->text('content')->nullable();           // Nullable TEXT
+            $table->integer('views')->default(0);          // Integer with default value
+            $table->boolean('is_published')->default(true);// Boolean
+            $table->timestamps();                          // created_at & updated_at
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('articles');
+    }
+};
+```
+
+#### Blueprint Column Types Supported:
+- `$table->id('id')`
+- `$table->string('name', 255)`
+- `$table->text('bio')`
+- `$table->integer('votes')`
+- `$table->bigInteger('amount')`
+- `$table->boolean('active')`
+- `$table->float('rating')`
+- `$table->decimal('price', 10, 2)`
+- `$table->date('published_on')`
+- `$table->dateTime('event_at')`
+- `$table->timestamp('verified_at')`
+- `$table->timestamps()` (creates `created_at` and `updated_at`)
+- Modifiers: `->nullable()`, `->default($val)`, `->unique()`, `->primary()`
+
+### 4. Running Migrations
+
+```bash
+# Apply pending migrations
+php srin migrate
+
+# Check migration status
+php srin migrate:status
+
+# Rollback last migration batch
+php srin migrate:rollback
+
+# Wipe database and rebuild from scratch
+php srin migrate:fresh
+```
+
+### 5. Writing and Using Models (`Core\Model`)
+
+Models live in `Model/` and automatically map to plural snake_cased tables (`Article` &rarr; `articles`, `Inquiry` &rarr; `inquiries`). You can override `$table`, `$primaryKey`, and protect fields with `$fillable` or `$guarded`:
+
+```php
+<?php
+
+namespace Model;
+
+use Core\Model;
+
+class Article extends Model
+{
+    protected static string $table = 'articles';
+
+    protected array $fillable = [
+        'title',
+        'slug',
+        'content',
+        'views',
+        'is_published',
+    ];
+}
+```
+
+#### Complete ActiveRecord CRUD Operations:
+
+```php
+use Model\Article;
+
+// 1. Create a record (Mass-assignment safe via $fillable)
+$article = Article::create([
+    'title'        => 'Mastering Srin Engine',
+    'slug'         => 'mastering-srin-engine',
+    'content'      => 'A complete guide to building fast PHP sites...',
+    'is_published' => true,
+]);
+
+// 2. Find by Primary Key
+$article = Article::find(1);
+$article = Article::findOrFail(1); // Throws 404 if not found!
+
+// 3. Querying with Fluent Query Builder (SQL-Injection-Proof via PDO Prepared Statements)
+$published = Article::where('is_published', true)
+    ->orderBy('created_at', 'DESC')
+    ->limit(10)
+    ->get();
+
+$first = Article::where('slug', 'mastering-srin-engine')->first();
+
+// 4. Update
+$article->title = 'Updated Title';
+$article->save();
+
+// Or mass update:
+$article->update([
+    'views' => 150,
+]);
+
+// 5. Delete
+$article->delete();
+// Or delete by ID:
+Article::destroy(1);
+
+// 6. Aggregates & Checks
+$total = Article::where('is_published', true)->count();
+$exists = Article::where('slug', 'test')->exists();
+
+// 7. Serialization
+$array = $article->toArray();
+$json  = $article->toJson();
+```
+
+#### Using Models in Controllers:
+
+```php
+<?php
+
+namespace Controller;
+
+use Core\BaseController;
+use Model\Article;
+
+class BlogController extends BaseController
+{
+    public function index(): string
+    {
+        $articles = Article::where('is_published', true)
+            ->latest()
+            ->get();
+
+        return $this->render('blog/index', [
+            'title'    => 'Our Blog',
+            'articles' => $articles,
+        ]);
+    }
+
+    public function show(string $slug): string
+    {
+        $article = Article::where('slug', $slug)->first();
+
+        if (!$article) {
+            $this->abort(404, 'Article not found');
+        }
+
+        return $this->render('blog/show', [
+            'title'   => $article->title,
+            'article' => $article,
+        ]);
+    }
+}
 ```
 
 ---

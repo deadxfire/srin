@@ -15,6 +15,10 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         array (
             'PHPMailer\\PHPMailer\\' => 20,
         ),
+        'M' =>
+        array (
+            'Model\\' => 6,
+        ),
         'C' =>
         array (
             'Core\\' => 5,
@@ -27,6 +31,10 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         'PHPMailer\\PHPMailer\\' =>
         array (
             0 => __DIR__ . '/..' . '/phpmailer/phpmailer/src',
+        ),
+        'Model\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/Model',
         ),
         'Core\\' =>
         array (
@@ -51,6 +59,7 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         'Core\\Response' => __DIR__ . '/../..' . '/Core/Response.php',
         'Core\\Route' => __DIR__ . '/../..' . '/Core/Route.php',
         'Core\\Router' => __DIR__ . '/../..' . '/Core/Router.php',
+        'Core\\Security' => __DIR__ . '/../..' . '/Core/Security.php',
         'Core\\View' => __DIR__ . '/../..' . '/Core/View.php',
         'PHPMailer\\PHPMailer\\DSNConfigurator' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/DSNConfigurator.php',
         'PHPMailer\\PHPMailer\\Exception' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/Exception.php',

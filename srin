@@ -40,6 +40,30 @@ switch ($command) {
         handleMakeController($arguments, $baseDir);
         break;
 
+    case 'make:model':
+        handleMakeModel($arguments, $baseDir);
+        break;
+
+    case 'make:migration':
+        handleMakeMigration($arguments, $baseDir);
+        break;
+
+    case 'migrate':
+        handleMigrate($baseDir);
+        break;
+
+    case 'migrate:rollback':
+        handleMigrateRollback($baseDir);
+        break;
+
+    case 'migrate:status':
+        handleMigrateStatus($baseDir);
+        break;
+
+    case 'migrate:fresh':
+        handleMigrateFresh($baseDir);
+        break;
+
     case 'make:page':
         handleMakePage($arguments, $baseDir);
         break;
@@ -615,6 +639,293 @@ function handleServe(array $args): void
 }
 
 /**
+ * Bootstrap Srin Application environment for CLI commands.
+ */
+function bootstrapApp(string $baseDir): void
+{
+    $autoload = $baseDir . '/Others/autoload.php';
+    if (file_exists($autoload)) {
+        require_once $autoload;
+    }
+    \Core\App::loadEnv($baseDir . '/.env');
+}
+
+/**
+ * Handle make:model command.
+ */
+function handleMakeModel(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a model name.\n", 'yellow');
+        echo "Usage: php srin make:model <Name> [-m|--migration]\n";
+        echo "Example: php srin make:model Post -m\n\n";
+        return;
+    }
+
+    $cleanName = ucfirst(preg_replace('/[^a-zA-Z0-9_]/', '', $name));
+    $modelDir = $baseDir . '/Model';
+    if (!is_dir($modelDir)) {
+        @mkdir($modelDir, 0777, true);
+    }
+
+    $modelPath = $modelDir . "/{$cleanName}.php";
+    if (file_exists($modelPath)) {
+        echo color("\n[X] Error: Model [{$cleanName}] already exists at Model/{$cleanName}.php\n\n", 'red');
+        return;
+    }
+
+    // Determine default plural table name
+    $short = $cleanName;
+    $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $short));
+    $table = (str_ends_with($snake, 'y') && !preg_match('/[aeiou]y$/', $snake))
+        ? substr($snake, 0, -1) . 'ies'
+        : (str_ends_with($snake, 's') ? $snake . 'es' : $snake . 's');
+
+    $template = <<<PHP
+<?php
+
+namespace Model;
+
+use Core\Model;
+
+/**
+ * {$cleanName} Model
+ * Table: {$table}
+ */
+class {$cleanName} extends Model
+{
+    /**
+     * The table associated with the model.
+     */
+    protected static string \$table = '{$table}';
+
+    /**
+     * The attributes that are mass assignable.
+     *
+     * @var array<string>
+     */
+    protected array \$fillable = [
+        // 'title', 'content', 'status',
+    ];
+
+    /**
+     * The attributes that should be guarded from mass assignment.
+     *
+     * @var array<string>
+     */
+    protected array \$guarded = [
+        'id',
+    ];
+}
+PHP;
+
+    file_put_contents($modelPath, $template);
+    echo color("\n[✓] Model created successfully!", 'green') . "\n";
+    echo "  Location: " . color("Model/{$cleanName}.php", 'cyan') . "\n";
+    echo "  Table: " . color($table, 'yellow') . "\n";
+
+    // Check for -m or --migration flag
+    $hasMigration = in_array('-m', $args, true) || in_array('--migration', $args, true);
+    if ($hasMigration) {
+        $migrationName = "create_{$table}_table";
+        handleMakeMigration(['make:migration', $migrationName], $baseDir, $table);
+    } else {
+        echo "\n";
+    }
+}
+
+/**
+ * Handle make:migration command.
+ */
+function handleMakeMigration(array $args, string $baseDir, ?string $targetTable = null): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a migration name.\n", 'yellow');
+        echo "Usage: php srin make:migration <name>\n";
+        echo "Example: php srin make:migration create_posts_table\n\n";
+        return;
+    }
+
+    $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9_]/', '_', $name));
+    $cleanName = trim($cleanName, '_');
+
+    $migrationsDir = $baseDir . '/database/migrations';
+    if (!is_dir($migrationsDir)) {
+        @mkdir($migrationsDir, 0777, true);
+    }
+
+    $timestamp = date('Y_m_d_His');
+    $filename = "{$timestamp}_{$cleanName}.php";
+    $filePath = "{$migrationsDir}/{$filename}";
+
+    // Guess table name if create_..._table pattern
+    $table = $targetTable;
+    if (!$table && preg_match('/^create_(.+)_table$/', $cleanName, $matches)) {
+        $table = $matches[1];
+    }
+    $table = $table ?: 'my_table';
+
+    $template = <<<PHP
+<?php
+
+use Core\Migration;
+use Core\Schema;
+use Core\Blueprint;
+
+return new class extends Migration {
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('{$table}', function (Blueprint \$table) {
+            \$table->id();
+            \$table->string('name');
+            \$table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('{$table}');
+    }
+};
+PHP;
+
+    file_put_contents($filePath, $template);
+    echo color("\n[✓] Migration created successfully!", 'green') . "\n";
+    echo "  File: " . color("database/migrations/{$filename}", 'cyan') . "\n";
+    echo "  Run via: " . color("php srin migrate\n\n", 'yellow');
+}
+
+/**
+ * Handle migrate command.
+ */
+function handleMigrate(string $baseDir): void
+{
+    bootstrapApp($baseDir);
+
+    echo color("\nRunning database migrations...\n", 'cyan');
+    $migrator = new \Core\Migrator($baseDir . '/database/migrations');
+
+    $start = microtime(true);
+    try {
+        $applied = $migrator->run(function ($action, $file) {
+            if ($action === 'migrating') {
+                echo "  Migrating: " . color($file, 'yellow') . "\r";
+            } elseif ($action === 'migrated') {
+                echo "  " . color("[DONE]", 'green') . " Migrated: {$file}\n";
+            }
+        });
+
+        $duration = round((microtime(true) - $start) * 1000, 2);
+
+        if (empty($applied)) {
+            echo color("Nothing to migrate. Database is already up to date.\n\n", 'green');
+        } else {
+            echo color("\n[✓] Migrations finished in {$duration}ms! (" . count($applied) . " applied)\n\n", 'green');
+        }
+    } catch (\Throwable $e) {
+        echo color("\n[X] Migration Error: " . $e->getMessage() . "\n\n", 'red');
+    }
+}
+
+/**
+ * Handle migrate:rollback command.
+ */
+function handleMigrateRollback(string $baseDir): void
+{
+    bootstrapApp($baseDir);
+
+    echo color("\nRolling back database migrations...\n", 'cyan');
+    $migrator = new \Core\Migrator($baseDir . '/database/migrations');
+
+    try {
+        $rolledBack = $migrator->rollback(function ($action, $file) {
+            if ($action === 'rolling_back') {
+                echo "  Rolling back: " . color($file, 'yellow') . "\r";
+            } elseif ($action === 'rolled_back') {
+                echo "  " . color("[DONE]", 'green') . " Rolled back: {$file}\n";
+            }
+        });
+
+        if (empty($rolledBack)) {
+            echo color("Nothing to rollback.\n\n", 'yellow');
+        } else {
+            echo color("\n[✓] Rolled back " . count($rolledBack) . " migration(s) successfully.\n\n", 'green');
+        }
+    } catch (\Throwable $e) {
+        echo color("\n[X] Rollback Error: " . $e->getMessage() . "\n\n", 'red');
+    }
+}
+
+/**
+ * Handle migrate:status command.
+ */
+function handleMigrateStatus(string $baseDir): void
+{
+    bootstrapApp($baseDir);
+
+    echo color("\nDATABASE MIGRATIONS STATUS:\n", 'cyan');
+    $migrator = new \Core\Migrator($baseDir . '/database/migrations');
+
+    try {
+        $status = $migrator->status();
+
+        if (empty($status)) {
+            echo "No migrations found in database/migrations/.\n\n";
+            return;
+        }
+
+        echo str_repeat('-', 90) . "\n";
+        printf("%-8s | %-48s | %-7s | %-19s\n", "RAN?", "MIGRATION", "BATCH", "APPLIED AT");
+        echo str_repeat('-', 90) . "\n";
+
+        foreach ($status as $row) {
+            $ranStr = $row['ran'] ? color(' YES ', 'green') : color(' NO  ', 'red');
+            $batchStr = $row['batch'] !== null ? "Batch {$row['batch']}" : '-';
+            $timeStr = $row['created_at'] ?: '-';
+
+            printf("%s | %-48s | %-7s | %-19s\n", $ranStr, $row['migration'], $batchStr, $timeStr);
+        }
+
+        echo str_repeat('-', 90) . "\n\n";
+    } catch (\Throwable $e) {
+        echo color("\n[X] Error: " . $e->getMessage() . "\n\n", 'red');
+    }
+}
+
+/**
+ * Handle migrate:fresh command.
+ */
+function handleMigrateFresh(string $baseDir): void
+{
+    bootstrapApp($baseDir);
+
+    echo color("\nDropping all tables and re-running migrations...\n", 'yellow');
+    $migrator = new \Core\Migrator($baseDir . '/database/migrations');
+
+    try {
+        $applied = $migrator->fresh(function ($action, $file) {
+            if ($action === 'migrated') {
+                echo "  " . color("[DONE]", 'green') . " Migrated: {$file}\n";
+            }
+        });
+
+        echo color("\n[✓] Fresh database migration completed! (" . count($applied) . " applied)\n\n", 'green');
+    } catch (\Throwable $e) {
+        echo color("\n[X] Fresh Error: " . $e->getMessage() . "\n\n", 'red');
+    }
+}
+
+/**
  * Show Help / List of Commands.
  */
 function showHelp(): void
@@ -629,6 +940,12 @@ function showHelp(): void
     echo color("AVAILABLE COMMANDS:\n", 'yellow');
     echo "  " . color("make:controller <Name>", 'green') . "      Create a new controller in Controller/\n";
     echo "  " . color("make:controller <Name> --mail", 'green') . " Create a controller with mail transfer methods\n";
+    echo "  " . color("make:model <Name> [-m]", 'green') . "         Create a model in Model/ (and migration with -m)\n";
+    echo "  " . color("make:migration <name>", 'green') . "          Create a migration in database/migrations/\n";
+    echo "  " . color("migrate", 'green') . "                        Run all pending database migrations\n";
+    echo "  " . color("migrate:rollback", 'green') . "               Rollback the last batch of migrations\n";
+    echo "  " . color("migrate:status", 'green') . "                 View migration status table\n";
+    echo "  " . color("migrate:fresh", 'green') . "                  Drop all tables and re-run all migrations\n";
     echo "  " . color("make:page <name>", 'green') . "            Create a new frontend page (name.srin.php)\n";
     echo "  " . color("make:layout <name>", 'green') . "          Create a master layout (name.srin.php)\n";
     echo "  " . color("make:error <code>", 'green') . "           Create custom error page (Pages/errors/code.srin.php)\n";
@@ -638,11 +955,12 @@ function showHelp(): void
     echo "  " . color("help", 'green') . "                        Display this help screen\n\n";
 
     echo color("EXAMPLES:\n", 'yellow');
+    echo "  php srin make:model Post -m\n";
+    echo "  php srin make:migration create_inquiries_table\n";
+    echo "  php srin migrate\n";
+    echo "  php srin migrate:status\n";
     echo "  php srin make:controller HomeController\n";
-    echo "  php srin make:controller ContactController --mail\n";
     echo "  php srin make:page home\n";
-    echo "  php srin make:error 404\n";
-    echo "  php srin routes\n";
     echo "  php srin serve\n\n";
 }
 
