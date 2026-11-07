@@ -5,6 +5,10 @@ namespace Core;
 use ArrayAccess;
 use JsonSerializable;
 use Exception;
+use Core\Relations\Relation;
+use Core\Relations\HasMany;
+use Core\Relations\HasOne;
+use Core\Relations\BelongsTo;
 
 /**
  * ============================================================================
@@ -49,6 +53,12 @@ abstract class Model implements ArrayAccess, JsonSerializable
      * The model's original attributes.
      */
     protected array $original = [];
+
+    /**
+     * Loaded relationship instances.
+     * @var array<string, mixed>
+     */
+    protected array $relations = [];
 
     /**
      * Indicates if the model exists in the database.
@@ -300,11 +310,148 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Start a new query on the model's table with optional eager loaded relations.
+     */
+    public static function with(string|array $relations): QueryBuilder
+    {
+        return static::query()->with($relations);
+    }
+
+    /**
+     * Get a single attribute.
+     */
+    public function getAttribute(string $key): mixed
+    {
+        return $this->attributes[$key] ?? null;
+    }
+
+    /**
+     * Set a single attribute.
+     */
+    public function setAttribute(string $key, mixed $value): void
+    {
+        $this->attributes[$key] = $value;
+    }
+
+    /**
+     * Get a loaded relationship result.
+     */
+    public function getRelation(string $name): mixed
+    {
+        return $this->relations[$name] ?? null;
+    }
+
+    /**
+     * Set a loaded relationship result.
+     */
+    public function setRelation(string $name, mixed $value): self
+    {
+        $this->relations[$name] = $value;
+        return $this;
+    }
+
+    /**
+     * Determine if the given relation is loaded.
+     */
+    public function relationLoaded(string $name): bool
+    {
+        return array_key_exists($name, $this->relations);
+    }
+
+    /**
+     * Get the default foreign key name for the model.
+     */
+    public function getForeignKey(): string
+    {
+        $short = (new \ReflectionClass(static::class))->getShortName();
+        $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $short));
+        return $snake . '_id';
+    }
+
+    /**
+     * Define a one-to-many relationship.
+     *
+     * @param string $related The related model class
+     * @param string|null $foreignKey Foreign key on the related table
+     * @param string|null $localKey Local key on this model's table
+     */
+    public function hasMany(string $related, ?string $foreignKey = null, ?string $localKey = null): HasMany
+    {
+        $foreignKey = $foreignKey ?: $this->getForeignKey();
+        $localKey = $localKey ?: static::getPrimaryKey();
+        return new HasMany($this, $related, $foreignKey, $localKey);
+    }
+
+    /**
+     * Define a one-to-one relationship.
+     *
+     * @param string $related The related model class
+     * @param string|null $foreignKey Foreign key on the related table
+     * @param string|null $localKey Local key on this model's table
+     */
+    public function hasOne(string $related, ?string $foreignKey = null, ?string $localKey = null): HasOne
+    {
+        $foreignKey = $foreignKey ?: $this->getForeignKey();
+        $localKey = $localKey ?: static::getPrimaryKey();
+        return new HasOne($this, $related, $foreignKey, $localKey);
+    }
+
+    /**
+     * Define an inverse one-to-one or one-to-many relationship.
+     *
+     * @param string $related The related model class
+     * @param string|null $foreignKey Foreign key on this model's table
+     * @param string|null $ownerKey Primary key on the related model's table
+     */
+    public function belongsTo(string $related, ?string $foreignKey = null, ?string $ownerKey = null): BelongsTo
+    {
+        $short = (new \ReflectionClass($related))->getShortName();
+        $snake = strtolower(preg_replace('/(?<!^)[A-Z]/', '_$0', $short));
+        $foreignKey = $foreignKey ?: $snake . '_id';
+        $ownerKey = $ownerKey ?: $related::getPrimaryKey();
+        return new BelongsTo($this, $related, $foreignKey, $ownerKey);
+    }
+
+    /**
+     * Eager load relations on an existing model instance.
+     */
+    public function load(string|array $relations): self
+    {
+        $relations = is_array($relations) ? $relations : func_get_args();
+        $dummyList = [$this];
+
+        foreach ($relations as $relationName) {
+            if (method_exists($this, $relationName)) {
+                $relation = $this->$relationName();
+                if ($relation instanceof Relation) {
+                    $eagerQuery = $relation->getEagerQuery($dummyList);
+                    $results = $eagerQuery->get();
+                    $relation->match($dummyList, $results, $relationName);
+                }
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Convert the model's attributes to an array.
      */
     public function toArray(): array
     {
-        return $this->attributes;
+        $attributes = $this->attributes;
+
+        foreach ($this->relations as $name => $relation) {
+            if (is_array($relation)) {
+                $attributes[$name] = array_map(fn($item) => $item instanceof Model ? $item->toArray() : $item, $relation);
+            } elseif ($relation instanceof Model) {
+                $attributes[$name] = $relation->toArray();
+            } else {
+                $attributes[$name] = $relation;
+            }
+        }
+
+        return $attributes;
     }
 
     /**
@@ -324,11 +471,28 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
-     * Magic property getter.
+     * Magic property getter with lazy-loading relationship support.
      */
     public function __get(string $key): mixed
     {
-        return $this->attributes[$key] ?? null;
+        if (array_key_exists($key, $this->attributes)) {
+            return $this->attributes[$key];
+        }
+
+        if (array_key_exists($key, $this->relations)) {
+            return $this->relations[$key];
+        }
+
+        if (method_exists($this, $key)) {
+            $relation = $this->$key();
+            if ($relation instanceof Relation) {
+                $results = $relation->getResults();
+                $this->relations[$key] = $results;
+                return $results;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -344,7 +508,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function __isset(string $key): bool
     {
-        return isset($this->attributes[$key]);
+        return isset($this->attributes[$key]) || isset($this->relations[$key]);
     }
 
     /**
@@ -352,7 +516,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public function __unset(string $key): void
     {
-        unset($this->attributes[$key]);
+        unset($this->attributes[$key], $this->relations[$key]);
     }
 
     // ArrayAccess implementation

@@ -21,6 +21,7 @@ class QueryBuilder
     protected ?int $limitValue = null;
     protected ?int $offsetValue = null;
     protected ?string $modelClass = null;
+    protected array $eagerLoad = [];
 
     /**
      * Whitelist of safe comparison operators for WHERE conditions.
@@ -285,6 +286,15 @@ class QueryBuilder
     }
 
     /**
+     * Set relations to be eager loaded with models.
+     */
+    public function with(string|array $relations): self
+    {
+        $this->eagerLoad = array_merge($this->eagerLoad, is_array($relations) ? $relations : func_get_args());
+        return $this;
+    }
+
+    /**
      * Execute SELECT query and return array of records or Model instances.
      */
     public function get(): array
@@ -296,10 +306,34 @@ class QueryBuilder
             foreach ($rows as $row) {
                 $models[] = new $this->modelClass($row, true);
             }
+
+            if (!empty($this->eagerLoad) && !empty($models)) {
+                $models = $this->eagerLoadRelations($models);
+            }
+
             return $models;
         }
 
         return $rows;
+    }
+
+    /**
+     * Eager load relations for the model set.
+     */
+    protected function eagerLoadRelations(array $models): array
+    {
+        foreach ($this->eagerLoad as $relationName) {
+            $dummy = new $this->modelClass();
+            if (method_exists($dummy, $relationName)) {
+                $relation = $dummy->$relationName();
+                if ($relation instanceof \Core\Relations\Relation) {
+                    $eagerQuery = $relation->getEagerQuery($models);
+                    $results = $eagerQuery->get();
+                    $models = $relation->match($models, $results, $relationName);
+                }
+            }
+        }
+        return $models;
     }
 
     /**

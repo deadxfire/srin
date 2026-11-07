@@ -1,5 +1,5 @@
 # ==============================================================================
-# Srin Engine - Web Server Security & Routing Rules (.htaccess)
+# Rinswa Engine - Web Server Security & Routing Rules (.htaccess)
 # Developed by Arindam Makar
 # ==============================================================================
 
@@ -33,7 +33,7 @@ ErrorDocument 404 /index.php
     RewriteRule ^ - [L]
 
     # Route ALL other requests to index.php
-    # Direct access to /core/App.php, /Config/app.php, /Pages/welcome.srin.php, etc.
+    # Direct access to /core/App.php, /Config/app.php, /Pages/welcome.rinswa.php, etc.
     # will be processed by index.php -> Router -> Response::renderError(404)!
     RewriteRule ^ index.php [L,QSA]
 </IfModule>
