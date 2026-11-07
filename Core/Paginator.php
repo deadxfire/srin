@@ -152,6 +152,23 @@ class Paginator implements IteratorAggregate, Countable, ArrayAccess, JsonSerial
     }
 
     /**
+     * Fluent alias for appending query parameters.
+     * Example: $posts->withQuery(['q' => $q]);
+     */
+    public function withQuery(array $query = []): self
+    {
+        return $this->appends($query);
+    }
+
+    /**
+     * Render pagination links HTML (alias for links()).
+     */
+    public function render(): string
+    {
+        return $this->links();
+    }
+
+    /**
      * Get URL for a given page number.
      */
     public function url(int $page): string

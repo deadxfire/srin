@@ -170,6 +170,98 @@ class QueryBuilder
     }
 
     /**
+     * Add a WHERE LIKE condition.
+     * Automatically wraps value with % if wildcards are omitted.
+     */
+    public function whereLike(string $column, string $pattern, string $boolean = 'AND'): self
+    {
+        if (!str_contains($pattern, '%')) {
+            $pattern = "%{$pattern}%";
+        }
+
+        $this->wheres[] = [
+            'type'     => 'basic',
+            'boolean'  => $boolean,
+            'column'   => $column,
+            'operator' => 'LIKE',
+            'value'    => $pattern,
+        ];
+
+        $this->bindings[] = $pattern;
+        return $this;
+    }
+
+    /**
+     * Apply a callback when a condition is met / truthy.
+     * Example: $query->when($category, fn($q, $val) => $q->where('category', $val));
+     */
+    public function when(mixed $value, callable $callback, ?callable $default = null): self
+    {
+        $condition = is_callable($value) ? $value($this) : !empty($value);
+
+        if ($condition) {
+            $callback($this, $value);
+        } elseif ($default !== null) {
+            $default($this, $value);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Search across one or multiple columns with SQL LIKE.
+     * Automatically skips cleanly if keyword is empty/null.
+     * Example: $query->search('title', $q)
+     * Example: $query->search(['title', 'content', 'author'], $q)
+     */
+    public function search(string|array $columns, ?string $keyword): self
+    {
+        $keyword = trim((string) $keyword);
+        if ($keyword === '') {
+            return $this;
+        }
+
+        $cols = is_array($columns) ? $columns : [$columns];
+        $pattern = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $keyword) . '%';
+
+        $clauses = [];
+        foreach ($cols as $col) {
+            $clauses[] = $this->wrap($col) . ' LIKE ?';
+            $this->bindings[] = $pattern;
+        }
+
+        $this->wheres[] = [
+            'type'    => 'raw',
+            'boolean' => 'AND',
+            'sql'     => '(' . implode(' OR ', $clauses) . ')',
+        ];
+
+        return $this;
+    }
+
+    /**
+     * Apply an associative array of key-value filters.
+     * Automatically ignores empty strings or null values.
+     * Example: $query->filter(['category' => $cat, 'author_id' => $authorId])
+     */
+    public function filter(array $filters): self
+    {
+        foreach ($filters as $column => $value) {
+            if ($value === null || $value === '' || (is_array($value) && empty($value))) {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $this->whereIn($column, $value);
+            } else {
+                $this->where($column, $value);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * Order by column.
      */
     public function orderBy(string $column, string $direction = 'ASC'): self
@@ -256,7 +348,7 @@ class QueryBuilder
 
         foreach ($this->wheres as $i => $w) {
             $prefix = ($i === 0) ? '' : $w['boolean'] . ' ';
-            $column = $this->wrap($w['column']);
+            $column = isset($w['column']) ? $this->wrap($w['column']) : '';
 
             switch ($w['type']) {
                 case 'basic':
@@ -371,6 +463,107 @@ class QueryBuilder
     public function exists(): bool
     {
         return $this->count() > 0;
+    }
+
+    /**
+     * Return clean array of distinct non-empty values for a column.
+     * Zero-memory database-level extraction.
+     * Example: Post::where('is_published', true)->distinctValues('category');
+     */
+    public function distinctValues(string $column): array
+    {
+        $cleanCol = $this->wrap($column);
+        $q = clone $this;
+        $q->columns = ["DISTINCT {$cleanCol} AS _val"];
+        $q->orders = ["_val ASC"];
+        $q->limitValue = null;
+        $q->offsetValue = null;
+
+        $rows = Database::select($q->toSql(), $q->bindings);
+        $values = [];
+        foreach ($rows as $row) {
+            $v = $row['_val'] ?? null;
+            if ($v !== null && $v !== '') {
+                $values[] = $v;
+            }
+        }
+        return array_values(array_unique($values));
+    }
+
+    /**
+     * Get an array of values from a single column, optionally keyed by another column.
+     * Example: Post::pluck('title') => ['First Post', 'Second Post']
+     * Example: Post::pluck('title', 'id') => [1 => 'First Post', 2 => 'Second Post']
+     */
+    public function pluck(string $column, ?string $key = null, bool $distinct = false): array
+    {
+        $cols = [$this->wrap($column) . ' AS _val'];
+        if ($key !== null) {
+            $cols[] = $this->wrap($key) . ' AS _key';
+        }
+        if ($distinct) {
+            $cols[0] = 'DISTINCT ' . $cols[0];
+        }
+
+        $q = clone $this;
+        $q->columns = $cols;
+        $rows = Database::select($q->toSql(), $q->bindings);
+
+        $result = [];
+        foreach ($rows as $row) {
+            if ($key !== null && array_key_exists('_key', $row)) {
+                $result[$row['_key']] = $row['_val'] ?? null;
+            } else {
+                $result[] = $row['_val'] ?? null;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Increment a column's value by a given amount.
+     */
+    public function increment(string $column, int $amount = 1): int
+    {
+        $cleanCol = str_replace(['`', '"', "'", ';', '--'], '', (string) $column);
+        $whereSql = !empty($this->wheres) ? ' WHERE ' . $this->buildWheres() : '';
+        $table = $this->wrap($this->table);
+        $sql = "UPDATE {$table} SET `{$cleanCol}` = `{$cleanCol}` + ?{$whereSql}";
+        if (Database::getDriver() === 'pgsql') {
+            $sql = str_replace('`', '"', $sql);
+        }
+        return Database::update($sql, array_merge([$amount], $this->bindings));
+    }
+
+    /**
+     * Decrement a column's value by a given amount.
+     */
+    public function decrement(string $column, int $amount = 1): int
+    {
+        return $this->increment($column, -$amount);
+    }
+
+    /**
+     * Chunk results to process large datasets efficiently.
+     */
+    public function chunk(int $size, callable $callback): bool
+    {
+        $page = 1;
+        do {
+            $q = clone $this;
+            $items = $q->limit($size)->offset(($page - 1) * $size)->get();
+            $count = count($items);
+            if ($count === 0) {
+                break;
+            }
+            if ($callback($items, $page) === false) {
+                return false;
+            }
+            unset($items);
+            $page++;
+        } while ($count === $size);
+
+        return true;
     }
 
     /**

@@ -220,6 +220,58 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Search across one or multiple columns with SQL LIKE.
+     * Example: Post::search('title', $q)->get();
+     */
+    public static function search(string|array $columns, ?string $keyword): QueryBuilder
+    {
+        return static::query()->search($columns, $keyword);
+    }
+
+    /**
+     * Apply an associative array of key-value filters.
+     * Example: Post::filter(['category' => $cat, 'status' => 'published'])->get();
+     */
+    public static function filter(array $filters): QueryBuilder
+    {
+        return static::query()->filter($filters);
+    }
+
+    /**
+     * Return distinct non-empty values for a column.
+     * Example: Post::distinctValues('category');
+     */
+    public static function distinctValues(string $column): array
+    {
+        return static::query()->distinctValues($column);
+    }
+
+    /**
+     * Pluck values from a single column.
+     * Example: Post::pluck('title') => ['First Post', 'Second Post']
+     */
+    public static function pluck(string $column, ?string $key = null, bool $distinct = false): array
+    {
+        return static::query()->pluck($column, $key, $distinct);
+    }
+
+    /**
+     * Apply conditional clause when truthy.
+     */
+    public static function when(mixed $value, callable $callback, ?callable $default = null): QueryBuilder
+    {
+        return static::query()->when($value, $callback, $default);
+    }
+
+    /**
+     * Forward any static calls directly to a new QueryBuilder instance.
+     */
+    public static function __callStatic(string $method, array $parameters): mixed
+    {
+        return static::query()->$method(...$parameters);
+    }
+
+    /**
      * Paginate models directly.
      */
     public static function paginate(int $perPage = 15, ?int $page = null, string $pageName = 'page'): Paginator

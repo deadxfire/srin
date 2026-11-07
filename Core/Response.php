@@ -41,6 +41,16 @@ class Response
     }
 
     /**
+     * Redirect back to previous URL (HTTP_REFERER) or a fallback route.
+     */
+    public static function back(int $statusCode = 302, string $fallback = '/'): void
+    {
+        $referer = $_SERVER['HTTP_REFERER'] ?? '';
+        $target = ($referer !== '' && filter_var($referer, FILTER_VALIDATE_URL)) ? $referer : $fallback;
+        self::redirect($target, $statusCode);
+    }
+
+    /**
      * Output HTML content.
      */
     public static function html(string $content, int $statusCode = 200): void

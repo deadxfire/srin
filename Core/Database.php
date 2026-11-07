@@ -172,6 +172,24 @@ class Database
     }
 
     /**
+     * Run a select query and return a single row or null.
+     */
+    public static function selectOne(string $sql, array $bindings = []): ?array
+    {
+        $res = self::raw($sql, $bindings)->fetch();
+        return $res !== false ? $res : null;
+    }
+
+    /**
+     * Run a select query and return a single scalar value.
+     */
+    public static function scalar(string $sql, array $bindings = []): mixed
+    {
+        $res = self::raw($sql, $bindings)->fetchColumn();
+        return $res !== false ? $res : null;
+    }
+
+    /**
      * Run an insert statement and return the last insert ID.
      */
     public static function insert(string $sql, array $bindings = []): int|string
@@ -241,5 +259,23 @@ class Database
     public static function disconnect(): void
     {
         self::$instances = [];
+    }
+
+    /**
+     * Fluent proxy instance for object-oriented database access via db().
+     */
+    protected static ?self $gatewayInstance = null;
+
+    public static function gateway(): static
+    {
+        if (self::$gatewayInstance === null) {
+            self::$gatewayInstance = new static();
+        }
+        return self::$gatewayInstance;
+    }
+
+    public function __call(string $method, array $parameters): mixed
+    {
+        return static::$method(...$parameters);
     }
 }

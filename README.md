@@ -10,6 +10,20 @@ Starts with a clean slate: no dummy controllers or unwanted bloat. The default p
 
 ---
 
+## 📖 Official Multipage Documentation
+
+Srin Engine includes a complete, high-detail multipage documentation portal modeled after industry-standard frameworks:
+Navigate to **`http://localhost:8000/docs`** or click **Documentation** in the top navigation bar.
+
+| Category | Chapters |
+| :--- | :--- |
+| **Prologue** | [Introduction & Philosophy](/docs/introduction) • [Installation & Quickstart](/docs/installation) • [Srin CLI Reference](/docs/cli) |
+| **The Basics** | [Routing & Named Routes](/docs/routing) • [Controllers & Actions](/docs/controllers) • [Templates, Layouts & Slots](/docs/views) • [Assets & Direct Image Linking](/docs/assets) |
+| **Database & ORM** | [Database Options & Connections](/docs/database) • [ActiveRecord Models & CRUD](/docs/models) • [QueryBuilder Superpowers](/docs/query-builder) • [Relationships & Eager Loading](/docs/relationships) • [Database Pagination](/docs/pagination) • [Schema & Migrations](/docs/migrations) • [Database Seeders](/docs/seeders) |
+| **Security & Extras** | [Security & Defense-in-Depth](/docs/security) • [Mail Transfer & SMTP](/docs/mailer) • [Global Helpers Reference](/docs/helpers) |
+
+---
+
 ## 🚀 Instant Download & Installation via Composer
 
 You can automatically download and scaffold the entire Srin system onto any new computer using Composer:
@@ -585,7 +599,9 @@ $userArray = $users[0]->toArray();
 $userJson  = $users[0]->toJson();
 ```
 
-#### Using Models in Controllers:
+#### Using Models in Controllers (Srin Standalone Style):
+
+Srin Engine is designed with a unique, ultra-clean standalone style that eliminates repetitive boilerplate.
 
 ```php
 <?php
@@ -597,15 +613,29 @@ use Model\Article;
 
 class BlogController extends BaseController
 {
+    /**
+     * Clean, expressive index action using Srin Standalone Superpowers:
+     */
     public function index(): string
     {
-        $articles = Article::where('is_published', true)
-            ->latest()
-            ->get();
+        $category = $this->get('category');
+        $search   = $this->get('q');
 
-        return $this->render('blog/index', [
-            'title'    => 'Our Blog',
-            'articles' => $articles,
+        // Effortless chained search, filter, and eager loading
+        $articles = Article::where('is_published', true)
+            ->with('comments')
+            ->filter(['category' => $category])
+            ->search('title', $search)
+            ->latest()
+            ->paginate(10);
+
+        return $this->view('blog/index', [
+            'title'          => 'Our Blog',
+            'articles'       => $articles,
+            'categories'     => Article::where('is_published', true)->distinctValues('category'),
+            'activeCategory' => $category,
+            'searchQuery'    => $search,
+            'totalArticles'  => Article::where('is_published', true)->count(),
         ]);
     }
 
@@ -617,7 +647,10 @@ class BlogController extends BaseController
             $this->abort(404, 'Article not found');
         }
 
-        return $this->render('blog/show', [
+        // Increment views counter
+        $article->increment('views');
+
+        return $this->view('blog/show', [
             'title'   => $article->title,
             'article' => $article,
         ]);
@@ -625,7 +658,68 @@ class BlogController extends BaseController
 }
 ```
 
-#### 5. Fluent Database Pagination (`Model::paginate()`):
+#### 5. Standalone QueryBuilder & Model Superpowers:
+
+| Method | Example | Description |
+| :--- | :--- | :--- |
+| `search($columns, $keyword)` | `Article::search(['title', 'content'], $q)->get()` | Performs multi-column SQL `LIKE` search. Automatically skips if keyword is empty/null! |
+| `filter($assocArray)` | `Article::filter(['category' => $cat, 'author_id' => $id])->get()` | Applies `WHERE` or `WHERE IN`. Automatically ignores empty strings or null keys! |
+| `when($value, $callback)` | `Article::when($featured, fn($q) => $q->where('featured', 1))` | Conditionally adds clauses when truthy without breaking the method chain. |
+| `distinctValues($column)` | `Article::where('is_published', 1)->distinctValues('category')` | Direct SQL-level extraction of unique column values (zero PHP memory overhead). |
+| `pluck($column, $key)` | `User::pluck('name', 'id')` | Extracts an array of column values, optionally indexed by `$key`. |
+| `increment($col, $amt)` | `Article::where('id', 5)->increment('views', 1)` | Atomically increments numeric columns directly in database. |
+| `decrement($col, $amt)` | `Product::where('id', 2)->decrement('stock', 1)` | Atomically decrements numeric columns directly in database. |
+| `chunk($size, $callback)` | `Article::chunk(100, fn($rows) => ...)` | Streams large datasets in manageable memory chunks. |
+
+#### 6. Database Options & Connections (`Config/database.php`):
+
+Srin Engine supports **SQLite**, **MySQL / MariaDB**, and **PostgreSQL** natively via `.env`:
+
+```env
+# 1. SQLite (Default - Zero-configuration embedded database)
+DB_CONNECTION=sqlite
+DB_DATABASE="database/database.sqlite"
+
+# 2. MySQL / MariaDB (Enterprise relational database with UTF8MB4)
+# DB_CONNECTION=mysql
+# DB_HOST=127.0.0.1
+# DB_PORT=3306
+# DB_DATABASE=srin_app
+# DB_USERNAME=root
+# DB_PASSWORD=secret
+
+# 3. PostgreSQL (High-concurrency with custom search path & SSL)
+# DB_CONNECTION=pgsql
+# DB_HOST=127.0.0.1
+# DB_PORT=5432
+# DB_DATABASE=srin_app
+# DB_USERNAME=postgres
+# DB_PASSWORD=secret
+```
+
+#### 7. Direct Database Gateway: `db('table')` & Raw SQL:
+
+You don't always need a Model. Access tables directly or run ACID transactions anywhere:
+
+```php
+// Query tables directly without defining a Model:
+$users = db('users')->where('status', 'active')->latest()->get();
+
+// Raw queries with parameter binding:
+$products = db()->select("SELECT * FROM products WHERE price < ? AND stock > ?", [100, 0]);
+
+// Single row and scalar values:
+$user = db()->selectOne("SELECT * FROM users WHERE email = ?", [$email]);
+$totalViews = db()->scalar("SELECT SUM(views) FROM articles WHERE is_published = 1");
+
+// ACID Transactions:
+db()->transaction(function ($pdo) {
+    db('accounts')->where('id', 1)->decrement('balance', 50);
+    db('accounts')->where('id', 2)->increment('balance', 50);
+});
+```
+
+#### 8. Fluent Database Pagination (`Model::paginate()`):
 
 Paginate records with automatic calculation of total pages, count, query string preservation, and responsive HTML link controls:
 
@@ -633,10 +727,8 @@ Paginate records with automatic calculation of total pages, count, query string 
 // In a Controller:
 $articles = Article::where('is_published', true)->latest()->paginate(10);
 
-// Preserve search / filter query parameters across pages:
-$articles->appends(['search' => $this->input('search')]);
-
-return $this->render('blog/index', ['articles' => $articles]);
+// Note: Current GET search & filter parameters are automatically preserved!
+return $this->view('blog/index', ['articles' => $articles]);
 ```
 
 In your `.srin.php` template:

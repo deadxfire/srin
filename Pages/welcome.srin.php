@@ -94,6 +94,7 @@
             </button>
 
             <nav class="nav-links" id="navLinks">
+                <a href="{{route('docs')}}" style="color: #0284c7; font-weight: 700;">Documentation &rarr;</a>
                 <a href="#quickstart">Quick Start</a>
                 <a href="#assets-guide">Assets</a>
                 <a href="#srin-cli">CLI</a>
@@ -119,8 +120,8 @@
                     A clean, fast Core PHP engine for static sites developed by <strong>Arindam Makar</strong>. Features dynamic extras like mail transfer, Composer packages in <code>Others/</code>, strict <code>.srin.php</code> templates, <code>@Connect</code> layouts, named routes, <code>@{{assets('/path')}}</code> direct linking, and automatic error page rendering.
                 </p>
                 <div class="hero-actions">
-                    <a href="#quickstart" class="btn btn-primary">Quick Start Guide</a>
-                    <a href="#error-pages" class="btn btn-outline">Error Pages Guide</a>
+                    <a href="{{route('docs')}}" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #4f46e5); color: #fff; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">Multipage Documentation &rarr;</a>
+                    <a href="#quickstart" class="btn btn-outline">Quick Start Guide</a>
                 </div>
             </div>
 
@@ -558,15 +559,12 @@ echo \$post-&gt;user-&gt;name;
                         <pre><code>// In a Controller:
 public function index(): string
 {
-    // Paginate 10 published articles per page:
+    // Paginate 10 published articles per page (auto-preserves GET search/filter parameters):
     \$articles = Article::where('is_published', true)
         -&gt;latest()
         -&gt;paginate(10);
 
-    // Optional: preserve search &amp; filter GET parameters across pages
-    \$articles-&gt;appends(['search' =&gt; \$this-&gt;input('search')]);
-
-    return \$this-&gt;render('articles/index', [
+    return \$this-&gt;view('articles/index', [
         'articles' =&gt; \$articles
     ]);
 }
@@ -583,12 +581,168 @@ public function index(): string
 @@paginate(\$articles)
 &lt;!-- Or render raw links: --&gt;
 @{!! \$articles-&gt;links() !!}</code></pre>
+
+                        <h3>8. Database Options &amp; Multi-Driver Connections (<code>Config/database.php</code>):</h3>
+                        <p>Srin Engine supports <strong>SQLite</strong>, <strong>MySQL / MariaDB</strong>, and <strong>PostgreSQL</strong> natively. Configure your default connection in <code>.env</code>:</p>
+
+                        <div class="helpers-table-wrapper">
+                            <table class="helpers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Driver</th>
+                                        <th>Key .env Settings</th>
+                                        <th>Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><strong>SQLite</strong> (Default)</td>
+                                        <td><code>DB_CONNECTION=sqlite</code><br><code>DB_DATABASE="database/database.sqlite"</code></td>
+                                        <td>Zero-configuration, serverless embedded database. Auto-creates SQLite file and directory if missing. Supports in-memory database (<code>:memory:</code>).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>MySQL / MariaDB</strong></td>
+                                        <td><code>DB_CONNECTION=mysql</code><br><code>DB_HOST=127.0.0.1</code><br><code>DB_PORT=3306</code><br><code>DB_DATABASE=srin_app</code><br><code>DB_USERNAME=root</code><br><code>DB_PASSWORD=secret</code></td>
+                                        <td>Enterprise relational database with UTF8MB4 charset, strict mode, auto-reconnect, and PDO prepared statement protection.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><strong>PostgreSQL</strong></td>
+                                        <td><code>DB_CONNECTION=pgsql</code><br><code>DB_HOST=127.0.0.1</code><br><code>DB_PORT=5432</code><br><code>DB_DATABASE=srin_app</code><br><code>DB_USERNAME=postgres</code></td>
+                                        <td>High-concurrency PostgreSQL support with custom search paths (<code>public</code> schema) and SSL negotiation modes.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <h3>9. Direct Database Gateway: <code>db('table')</code> &amp; Raw SQL Operations</h3>
+                        <p>You don't always need a model. Use the standalone <code>db('table')</code> helper or <code>Database</code> class for instant queries, transactions, and scalar queries anywhere in your application:</p>
+
+                        <pre><code>// 1. Fluent table query without a Model:
+\$activeUsers = db('users')-&gt;where('status', 'active')-&gt;latest()-&gt;get();
+
+// 2. Insert records:
+\$newId = db('logs')-&gt;insert(['action' =&gt; 'login', 'ip' =&gt; Request::ip()]);
+
+// 3. Raw SELECT query with parameter binding:
+\$rows = db()-&gt;select("SELECT * FROM products WHERE price &lt; ? AND stock &gt; ?", [100, 0]);
+
+// 4. Single row (selectOne) or single value (scalar):
+\$user = db()-&gt;selectOne("SELECT * FROM users WHERE email = ?", [\$email]);
+\$totalViews = db()-&gt;scalar("SELECT SUM(views) FROM articles WHERE is_published = 1");
+
+// 5. ACID Database Transactions:
+db()-&gt;transaction(function (\$pdo) {
+    db('accounts')-&gt;where('id', 1)-&gt;decrement('balance', 50);
+    db('accounts')-&gt;where('id', 2)-&gt;increment('balance', 50);
+});</code></pre>
+
+                        <h3>10. Standalone QueryBuilder Superpowers:</h3>
+                        <p>Srin Engine provides unique, developer-friendly methods that eliminate repetitive <code>if</code> checks and boilerplate:</p>
+
+                        <div class="helpers-table-wrapper">
+                            <table class="helpers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Method</th>
+                                        <th>Example</th>
+                                        <th>What It Does</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        <td><code>-&gt;search(\$cols, \$keyword)</code></td>
+                                        <td><code>Post::search(['title', 'content'], \$q)-&gt;get()</code></td>
+                                        <td>Searches across multiple columns with SQL LIKE. Automatically skips if keyword is empty/null!</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;filter(\$assocArray)</code></td>
+                                        <td><code>Post::filter(['category' =&gt; \$cat, 'author' =&gt; \$id])-&gt;get()</code></td>
+                                        <td>Applies WHERE/WHERE IN filters. Automatically ignores empty string or null values!</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;when(\$value, \$callback)</code></td>
+                                        <td><code>Post::when(\$featured, fn(\$q) =&gt; \$q-&gt;where('featured', 1))</code></td>
+                                        <td>Conditionally applies clauses when value is truthy without breaking method chains.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;distinctValues(\$col)</code></td>
+                                        <td><code>Post::where('published', 1)-&gt;distinctValues('category')</code></td>
+                                        <td>Extracts unique column values directly from SQL. Fast, clean, zero PHP memory waste!</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;pluck(\$col, \$key)</code></td>
+                                        <td><code>User::pluck('name', 'id')</code></td>
+                                        <td>Extracts an array of column values, optionally keyed by another column.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;increment(\$col, \$amt)</code></td>
+                                        <td><code>Post::where('id', 5)-&gt;increment('views', 1)</code></td>
+                                        <td>Atomically increments numeric column values in SQL.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>-&gt;decrement(\$col, \$amt)</code></td>
+                                        <td><code>Product::where('id', 2)-&gt;decrement('stock', 1)</code></td>
+                                        <td>Atomically decrements numeric column values in SQL.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <!-- 6. Controllers -->
                     <section id="controllers" class="doc-card">
-                        <h2>6. Writing Controllers</h2>
-                        <p>Controllers reside in <code>Controller/</code> and extend <code>Core\BaseController</code>. They provide complete access to view rendering, model querying, HTTP input parsing, server-side validation, CSRF verification, rate limiting, flash messages, JSON APIs, and secure asset downloads.</p>
+                        <h2>6. Writing Controllers (Standalone Srin Style)</h2>
+                        <p>Controllers reside in <code>Controller/</code> and extend <code>Core\BaseController</code>. Unlike traditional frameworks with heavy boilerplate and verbose syntax, Srin Engine provides an ultra-clean, expressive, standalone developer experience designed to write 3x less code while maintaining bulletproof security.</p>
+
+                        <h3>The Srin Standalone Style vs Traditional Verbose Style:</h3>
+                        <p>Compare the old verbose way with Srin's clean, intuitive standalone style:</p>
+
+                        <pre><code>// Traditional Verbose Style (30+ lines of repetitive code):
+public function index(): string
+{
+    \$search = trim((string) \$this-&gt;input('q', ''));
+    \$category = trim((string) \$this-&gt;input('category', ''));
+
+    \$query = Post::where('is_published', true)-&gt;with('comments');
+    if (\$category !== '') {
+        \$query-&gt;where('category', \$category);
+    }
+    if (\$search !== '') {
+        \$query-&gt;where('title', 'LIKE', "%{\$search}%");
+    }
+    \$posts = \$query-&gt;latest()-&gt;paginate(4);
+
+    \$allPosts = Post::where('is_published', true)-&gt;get();
+    \$categories = array_values(array_unique(array_filter(array_map(fn(\$p) =&gt; \$p-&gt;category, \$allPosts))));
+
+    return \$this-&gt;render('blog/index', [
+        'posts' =&gt; \$posts,
+        'categories' =&gt; \$categories,
+    ]);
+}
+
+// ✨ Srin Engine Standalone Style (Clean, elegant, 12 lines):
+public function index(): string
+{
+    \$category = \$this-&gt;get('category');
+    \$search   = \$this-&gt;get('q');
+
+    \$posts = Post::where('is_published', true)
+        -&gt;with('comments')
+        -&gt;filter(['category' =&gt; \$category])
+        -&gt;search('title', \$search)
+        -&gt;latest()
+        -&gt;paginate(4);
+
+    return \$this-&gt;view('blog/index', [
+        'title'          =&gt; 'Explore Srin Engine Blog',
+        'posts'          =&gt; \$posts,
+        'categories'     =&gt; Post::where('is_published', true)-&gt;distinctValues('category'),
+        'activeCategory' =&gt; \$category,
+        'searchQuery'    =&gt; \$search,
+        'totalPosts'     =&gt; Post::where('is_published', true)-&gt;count(),
+    ]);
+}</code></pre>
 
                         <h3>Detailed Production Controller Code Sample (<code>Controller/ArticleController.php</code>):</h3>
                         <pre><code>&lt;?php
@@ -757,19 +911,69 @@ class ArticleController extends BaseController
                                 </thead>
                                 <tbody>
                                     <tr>
+                                        <td><code>\$this-&gt;view(\$view, \$data)</code></td>
+                                        <td><code>string</code></td>
+                                        <td>Expressive template renderer for <code>Pages/{view}.srin.php</code>.</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>\$this-&gt;render(\$view, \$data)</code></td>
                                         <td><code>string</code></td>
                                         <td>Renders a <code>Pages/{view}.srin.php</code> template with layout.</td>
                                     </tr>
                                     <tr>
+                                        <td><code>\$this-&gt;get(\$key, \$default)</code></td>
+                                        <td><code>string|array</code></td>
+                                        <td>Quick GET query parameter fetcher. Auto-trims and sanitizes strings.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;post(\$key, \$default)</code></td>
+                                        <td><code>string|array</code></td>
+                                        <td>Quick POST body parameter fetcher. Auto-trims and sanitizes strings.</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>\$this-&gt;input(\$key, \$default)</code></td>
                                         <td><code>mixed</code></td>
-                                        <td>Retrieves a sanitized input value from GET or POST.</td>
+                                        <td>Retrieves a sanitized input value from GET or POST (auto-trimmed).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;has(\$key)</code> / <code>\$this-&gt;filled(\$key)</code></td>
+                                        <td><code>bool</code></td>
+                                        <td>Checks if an input parameter exists and is not null or empty string.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;search(\$key, \$default)</code></td>
+                                        <td><code>string</code></td>
+                                        <td>Retrieves clean search query string (defaults to <code>'q'</code>).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;int(\$key, \$default)</code></td>
+                                        <td><code>int</code></td>
+                                        <td>Retrieves an input value strictly cast to integer.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;bool(\$key, \$default)</code></td>
+                                        <td><code>bool</code></td>
+                                        <td>Retrieves an input value strictly cast to boolean.</td>
                                     </tr>
                                     <tr>
                                         <td><code>\$this-&gt;onlyInputs(\$keys)</code></td>
                                         <td><code>array</code></td>
                                         <td>Whitelists specific request fields (defeats mass-assignment).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;allInputs()</code></td>
+                                        <td><code>array</code></td>
+                                        <td>Retrieves all GET and POST inputs sanitized.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;isPost()</code> / <code>\$this-&gt;isGet()</code></td>
+                                        <td><code>bool</code></td>
+                                        <td>Checks if incoming HTTP request method is POST or GET.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;isAjax()</code></td>
+                                        <td><code>bool</code></td>
+                                        <td>Checks if request was made via AJAX / Fetch (X-Requested-With).</td>
                                     </tr>
                                     <tr>
                                         <td><code>\$this-&gt;validate(\$inputs, \$rules)</code></td>
@@ -792,9 +996,24 @@ class ArticleController extends BaseController
                                         <td>Throttles requests and aborts with HTTP 429 if exceeded.</td>
                                     </tr>
                                     <tr>
+                                        <td><code>\$this-&gt;flashSuccess(\$message)</code></td>
+                                        <td><code>\$this</code></td>
+                                        <td>Sets a session success flash message (chainable).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;flashError(\$message)</code></td>
+                                        <td><code>\$this</code></td>
+                                        <td>Sets a session error flash message (chainable).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>\$this-&gt;flashInfo(\$message)</code></td>
+                                        <td><code>\$this</code></td>
+                                        <td>Sets a session info flash message (chainable).</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>\$this-&gt;flash(\$key, \$message)</code></td>
                                         <td><code>\$this</code></td>
-                                        <td>Sets a session flash message available on the next request.</td>
+                                        <td>Sets a custom session flash message available on next request.</td>
                                     </tr>
                                     <tr>
                                         <td><code>\$this-&gt;redirectToRoute(\$name, \$params)</code></td>
@@ -807,9 +1026,9 @@ class ArticleController extends BaseController
                                         <td>Redirects the browser to an absolute or relative URL.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>\$this-&gt;back()</code></td>
+                                        <td><code>\$this-&gt;back(\$status, \$fallback)</code></td>
                                         <td><code>void</code></td>
-                                        <td>Redirects back to previous page or referer.</td>
+                                        <td>Redirects back to previous page or referer with fallback.</td>
                                     </tr>
                                     <tr>
                                         <td><code>\$this-&gt;json(\$data, \$status)</code></td>

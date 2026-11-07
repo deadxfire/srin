@@ -13,6 +13,15 @@ class BaseController
     }
 
     /**
+     * Expressive alias for render().
+     * Example: return $this->view('blog/index', ['posts' => $posts]);
+     */
+    protected function view(string $page, array $data = []): string
+    {
+        return $this->render($page, $data);
+    }
+
+    /**
      * Send a JSON response.
      */
     protected function json(mixed $data, int $statusCode = 200): void
@@ -26,6 +35,14 @@ class BaseController
     protected function redirect(string $url, int $statusCode = 302): void
     {
         Response::redirect($url, $statusCode);
+    }
+
+    /**
+     * Redirect back to previous URL (HTTP_REFERER) or a fallback route.
+     */
+    protected function back(int $statusCode = 302, string $fallback = '/'): void
+    {
+        Response::back($statusCode, $fallback);
     }
 
     /**
@@ -45,11 +62,102 @@ class BaseController
     }
 
     /**
-     * Get an input value from the request (sanitized).
+     * Get an input value from the request (sanitized and trimmed if string).
      */
     protected function input(string $key, mixed $default = null): mixed
     {
-        return Request::input($key, $default);
+        $val = Request::input($key, $default);
+        return is_string($val) ? trim($val) : $val;
+    }
+
+    /**
+     * Get a sanitized, trimmed string parameter from GET query.
+     * Example: $search = $this->get('q');
+     */
+    protected function get(string $key = '', mixed $default = ''): mixed
+    {
+        if ($key === '') {
+            return Security::cleanArray($_GET);
+        }
+        $val = $_GET[$key] ?? $default;
+        if (is_string($val)) {
+            return trim(Security::cleanString($val));
+        }
+        return is_array($val) ? Security::cleanArray($val) : $val;
+    }
+
+    /**
+     * Get a sanitized, trimmed parameter from POST body.
+     * Example: $title = $this->post('title');
+     */
+    protected function post(string $key = '', mixed $default = ''): mixed
+    {
+        if ($key === '') {
+            return Security::cleanArray($_POST);
+        }
+        $val = $_POST[$key] ?? $default;
+        if (is_string($val)) {
+            return trim(Security::cleanString($val));
+        }
+        return is_array($val) ? Security::cleanArray($val) : $val;
+    }
+
+    /**
+     * Check if a specific input key is present and not empty.
+     */
+    protected function has(string $key): bool
+    {
+        $val = $this->input($key, null);
+        if ($val === null) {
+            return false;
+        }
+        if (is_string($val)) {
+            return trim($val) !== '';
+        }
+        if (is_array($val)) {
+            return !empty($val);
+        }
+        return true;
+    }
+
+    /**
+     * Alias for has().
+     */
+    protected function filled(string $key): bool
+    {
+        return $this->has($key);
+    }
+
+    /**
+     * Get input strictly as an integer.
+     */
+    protected function int(string $key, int $default = 0): int
+    {
+        return Request::int($key, $default);
+    }
+
+    /**
+     * Get input strictly as a boolean.
+     */
+    protected function bool(string $key, bool $default = false): bool
+    {
+        return Request::bool($key, $default);
+    }
+
+    /**
+     * Quick shortcut to retrieve a sanitized search keyword.
+     */
+    protected function search(string $key = 'q', string $default = ''): string
+    {
+        return (string) $this->get($key, $default);
+    }
+
+    /**
+     * Check if request is AJAX / Fetch.
+     */
+    protected function isAjax(): bool
+    {
+        return Request::isAjax();
     }
 
     /**
@@ -95,9 +203,42 @@ class BaseController
     /**
      * Set a flash message.
      */
-    protected function flash(string $key, string $message): void
+    protected function flash(string $key, string $message): self
     {
         flash($key, $message);
+        return $this;
+    }
+
+    /**
+     * Set a success flash message.
+     */
+    protected function flashSuccess(string $message): self
+    {
+        return $this->flash('success', $message);
+    }
+
+    /**
+     * Set an error flash message.
+     */
+    protected function flashError(string $message): self
+    {
+        return $this->flash('error', $message);
+    }
+
+    /**
+     * Set an info flash message.
+     */
+    protected function flashInfo(string $message): self
+    {
+        return $this->flash('info', $message);
+    }
+
+    /**
+     * Set a warning flash message.
+     */
+    protected function flashWarning(string $message): self
+    {
+        return $this->flash('warning', $message);
     }
 
     /**

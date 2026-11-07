@@ -122,6 +122,16 @@ if (!function_exists('redirect')) {
     }
 }
 
+if (!function_exists('back')) {
+    /**
+     * Redirect back to the previous URL or referer.
+     */
+    function back(int $statusCode = 302, string $fallback = '/'): void
+    {
+        Response::back($statusCode, $fallback);
+    }
+}
+
 if (!function_exists('json')) {
     /**
      * Send a JSON response.
@@ -129,6 +139,22 @@ if (!function_exists('json')) {
     function json(mixed $data, int $statusCode = 200): void
     {
         Response::json($data, $statusCode);
+    }
+}
+
+if (!function_exists('db')) {
+    /**
+     * Convenient database gateway or table query builder.
+     * Example: db('posts')->where('is_published', true)->get();
+     * Example: db()->select("SELECT * FROM users WHERE active = ?", [1]);
+     * Example: db()->scalar("SELECT COUNT(*) FROM posts");
+     */
+    function db(?string $table = null): mixed
+    {
+        if ($table !== null) {
+            return \Core\Database::table($table);
+        }
+        return \Core\Database::gateway();
     }
 }
 
@@ -393,6 +419,20 @@ if (!function_exists('flash')) {
     }
 }
 
+if (!function_exists('has_flash')) {
+    /**
+     * Check if a flash message exists in session without clearing it.
+     */
+    function has_flash(string $key): bool
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        return !empty($_SESSION['_flash'][$key]);
+    }
+}
+
 if (!function_exists('old')) {
     /**
      * Get old input value flashed from previous request.
@@ -503,6 +543,17 @@ if (!function_exists('is_route')) {
     function is_route(string|array $patterns): bool
     {
         return \Core\Router::is($patterns);
+    }
+}
+
+if (!function_exists('is_route_active')) {
+    /**
+     * Check if the current route matches a pattern and return an active CSS class string.
+     * Example: <a class="<?= is_route_active('docs.*') ?>">Docs</a>
+     */
+    function is_route_active(string|array $patterns, string $activeClass = 'active'): string
+    {
+        return \Core\Router::is($patterns) ? $activeClass : '';
     }
 }
 
