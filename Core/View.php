@@ -31,27 +31,27 @@ class View
 
         $rawContent = file_get_contents($realPageFile);
 
-        // Detect @Connect directive at the start of a line (case-insensitive: @connect or @Connect, ignoring @@Connect)
+        // 1. Detect layout directive: [layout '...'] or [connect '...'] or {#layout '...'} or @connect('...')
         $layout = null;
-        if (preg_match('/^\s*(?<!@)@(?:connect|Connect)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?/mi', $rawContent, $layoutMatch)) {
-            $layout = trim($layoutMatch[1]);
-            // Remove the @connect directive line from page content
-            $rawContent = preg_replace('/^\s*(?<!@)@(?:connect|Connect)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?\r?\n?/mi', '', $rawContent, 1);
+        if (preg_match('/^\s*(?:\[(?:layout|connect)\s*[\'"]([^\'"]+)[\'"]\s*\]|\{#layout\s*[\'"]([^\'"]+)[\'"]\s*\}|(?<!@)@(?:connect|Connect)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?)/mi', $rawContent, $layoutMatch)) {
+            $layout = trim($layoutMatch[1] ?: ($layoutMatch[2] ?: $layoutMatch[3]));
+            // Remove the layout directive line from page content
+            $rawContent = preg_replace('/^\s*(?:\[(?:layout|connect)\s*[\'"]([^\'"]+)[\'"]\s*\]|\{#layout\s*[\'"]([^\'"]+)[\'"]\s*\}|(?<!@)@(?:connect|Connect)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?)\r?\n?/mi', '', $rawContent, 1);
         }
 
-        // Detect @title directive at the start of a line (ignoring @@title)
-        if (preg_match('/^\s*(?<!@)@title\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?/mi', $rawContent, $titleMatch)) {
-            $data['title'] = $titleMatch[1];
-            $rawContent = preg_replace('/^\s*(?<!@)@title\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?\r?\n?/mi', '', $rawContent, 1);
+        // 2. Detect title directive: [title '...'] or {#title '...'} or @title('...')
+        if (preg_match('/^\s*(?:\[title\s*[\'"]([^\'"]+)[\'"]\s*\]|\{#title\s*[\'"]([^\'"]+)[\'"]\s*\}|(?<!@)@title\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?)/mi', $rawContent, $titleMatch)) {
+            $data['title'] = $titleMatch[1] ?: ($titleMatch[2] ?: $titleMatch[3]);
+            $rawContent = preg_replace('/^\s*(?:\[title\s*[\'"]([^\'"]+)[\'"]\s*\]|\{#title\s*[\'"]([^\'"]+)[\'"]\s*\}|(?<!@)@title\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?)\r?\n?/mi', '', $rawContent, 1);
         }
 
-        // 3. Extract named content sections (@contentConnect, @connectContent, or @contentCconnect)
+        // 3. Extract named content sections: [block 'name']...[end] or {#block 'name'}...{/block} or @contentConnect('name')...@endContentConnect
         $sections = [];
-        $sectionPattern = '/(?<!@)@(?:contentConnect|contentCconnect|connectContent|connectCcontent)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)(.*?)(?<!@)@(?:endContentConnect|endContentCconnect|endConnectContent|endConnectCcontent)\b/si';
+        $sectionPattern = '/(?:\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)(?:\[(?:end|\/(?:block|section))\]|\{end\})|\{#(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\}(.*?)\{\/(?:block|section)\}|(?<!@)@(?:contentConnect|contentCconnect|connectContent|connectCcontent)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)(.*?)(?<!@)@(?:endContentConnect|endContentCconnect|endConnectContent|endConnectCcontent)\b)/si';
 
         $rawContent = preg_replace_callback($sectionPattern, function ($m) use (&$sections, $data) {
-            $name = trim($m[1]);
-            $blockRaw = $m[2];
+            $name = trim($m[1] ?: ($m[3] ?: $m[5]));
+            $blockRaw = $m[2] ?: ($m[4] ?: $m[6]);
             $compiledBlock = self::compileDirectives($blockRaw);
             $sections[$name] = self::evaluate($compiledBlock, $data);
             return '';
@@ -98,23 +98,23 @@ class View
         // Compile layout directives (@include, {{ }}, @csrf, etc.)
         $compiledLayout = self::compileDirectives($layoutRaw);
 
-        // 1. Replace named @content('slot_name', 'optional default') directives
+        // 1. Replace named slots: [slot 'name', 'default'], [slot 'name'], [content 'name'], {#slot 'name'}, or @content('name')
         $compiledLayout = preg_replace_callback(
-            '/(?<!@)@content\s*\(\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^)]+))?\s*\)/i',
+            '/(?:\[(?:slot|content)\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^\]]+))?\s*\]|\{#slot\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^}]+))?\s*\}|(?<!@)@content\s*\(\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^)]+))?\s*\))/i',
             function ($m) {
-                $slot = addslashes(trim($m[1]));
-                if (isset($m[2]) && trim($m[2]) !== '') {
-                    $default = trim($m[2]);
-                    return "<?= \$sections['{$slot}'] ?? ({$default}) ?>";
+                $slot = addslashes(trim($m[1] ?: ($m[3] ?: $m[5])));
+                $defaultParam = trim($m[2] ?: ($m[4] ?: ($m[6] ?? '')));
+                if ($defaultParam !== '') {
+                    return "<?= \$sections['{$slot}'] ?? ({$defaultParam}) ?>";
                 }
                 return "<?= \$sections['{$slot}'] ?? '' ?>";
             },
             $compiledLayout
         );
 
-        // 2. Replace generic @content directive with $content variable output
+        // 2. Replace generic slot: [slot], [content], {#slot}, or @content
         $compiledLayout = preg_replace(
-            '/(?<!@)@content\b(?!\s*\()/i',
+            '/(?:\[(?:slot|content)\]|\{#slot\}|(?<!@)@content\b(?!\s*\())/i',
             "<?= \$content ?? (\$sections['content'] ?? '') ?>",
             $compiledLayout
         );
@@ -150,12 +150,16 @@ class View
 
     /**
      * Compile lightweight template directives.
+     * Supports Srin Tags ([if], [each], [else], [empty], [end]), Svelte-style ({#if}, {#each}),
+     * and legacy Blade-style (@if, @foreach) for full backward compatibility.
      * Enforces strict XSS escaping on all {{ $expression }} outputs.
      */
     public static function compileDirectives(string $template): string
     {
-        // 1. Strip secure template comments: {{-- anything --}}
+        // 1. Strip comments: {{-- ... --}}, [-- ... --], or {#-- ... --#}
         $template = preg_replace('/\{\{--.*?--\}\}/s', '', $template);
+        $template = preg_replace('/\[--.*?--\]/s', '', $template);
+        $template = preg_replace('/\{#--.*?--#\}/s', '', $template);
 
         // 2. Temporarily protect escaped braces: @{{ ... }} or @{!! ... !!} (for Vue.js, Alpine, React)
         $escapedTokens = [];
@@ -165,7 +169,7 @@ class View
             return $token;
         }, $template);
 
-        // 3. Temporarily protect escaped directives (@@Connect, @@csrf, @@honeypot, @@if, etc.)
+        // 3. Temporarily protect escaped directives (@@Connect, @@csrf, @@if, \[[if]], etc.)
         $escaped = [
             '@@Connect'              => '%%ESCAPED_AT_CONNECT%%',
             '@@connect'              => '%%ESCAPED_AT_CONNECT%%',
@@ -176,18 +180,6 @@ class View
             '@@contentconnect'       => '%%ESCAPED_AT_CONTENTCONNECT%%',
             '@@connectContent'       => '%%ESCAPED_AT_CONNECTCONTENT%%',
             '@@connectcontent'       => '%%ESCAPED_AT_CONNECTCONTENT%%',
-            '@@contentCconnect'      => '%%ESCAPED_AT_CONTENTCCONNECT%%',
-            '@@contentcconnect'      => '%%ESCAPED_AT_CONTENTCCONNECT%%',
-            '@@connectCcontent'      => '%%ESCAPED_AT_CONNECTCCONNECT%%',
-            '@@connectccontent'      => '%%ESCAPED_AT_CONNECTCCONNECT%%',
-            '@@endContentConnect'    => '%%ESCAPED_AT_ENDCONTENTCONNECT%%',
-            '@@endcontentconnect'    => '%%ESCAPED_AT_ENDCONTENTCONNECT%%',
-            '@@endConnectContent'    => '%%ESCAPED_AT_ENDCONNECTCONTENT%%',
-            '@@endconnectcontent'    => '%%ESCAPED_AT_ENDCONNECTCONTENT%%',
-            '@@endContentCconnect'   => '%%ESCAPED_AT_ENDCONTENTCCONNECT%%',
-            '@@endcontentcconnect'   => '%%ESCAPED_AT_ENDCONTENTCCONNECT%%',
-            '@@endConnectCcontent'   => '%%ESCAPED_AT_ENDCONNECTCCONNECT%%',
-            '@@endconnectccontent'   => '%%ESCAPED_AT_ENDCONNECTCCONNECT%%',
             '@@csrf'                 => '%%ESCAPED_AT_CSRF%%',
             '@@honeypot'             => '%%ESCAPED_AT_HONEYPOT%%',
             '@@flash'                => '%%ESCAPED_AT_FLASH%%',
@@ -214,107 +206,244 @@ class View
         // 4. Raw / unescaped output: {!! $expression !!}
         $template = preg_replace('/\{!!\s*(.+?)\s*!!\}/s', '<?= $1 ?>', $template);
 
-        // 5. Built-in safe directive helpers (URLs and HTML fields)
-        $template = preg_replace(
-            '/\{\{\s*assets?\s*\((.*?)\)\s*\}\}/i',
-            '<?= assets($1) ?>',
-            $template
-        );
-
-        $template = preg_replace(
-            '/\{\{\s*route\s*\(\s*(.+?)\s*\)\s*\}\}/i',
-            '<?= route($1) ?>',
-            $template
-        );
-
-        $template = preg_replace(
-            '/\{\{\s*url\s*\((.*?)\)\s*\}\}/i',
-            '<?= url($1) ?>',
-            $template
-        );
-
-        $template = preg_replace(
-            '/\{\{\s*csrf_field\s*\(\s*\)\s*\}\}/i',
-            '<?= csrf_field() ?>',
-            $template
-        );
-
-        $template = preg_replace(
-            '/\{\{\s*honeypot_field\s*\(\s*\)\s*\}\}/i',
-            '<?= honeypot_field() ?>',
-            $template
-        );
-
-        // 6. Generic {{ $expression }} -> Auto-escaped with htmlspecialchars for bulletproof XSS protection!
+        // 5. Built-in safe directive helpers in {{ }} (assets, route, url, csrf_field, honeypot_field)
         $template = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($m) {
             $expr = trim($m[1]);
             if ($expr === '') {
                 return '{{ }}';
             }
             $expr = rtrim($expr, ';');
+            if (preg_match('/^(?:assets?|route|url|csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
+                return "<?= {$expr} ?>";
+            }
             return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
         }, $template);
 
-        // 7. Security & Template Directives:
-        // @csrf
-        $template = preg_replace('/(?<!@)@csrf\b/i', '<?= csrf_field() ?>', $template);
+        // 6. Standalone Directives: [csrf], [honeypot], [paginate], [include], [flash]
+        // CSRF: [csrf] or {#csrf} or @csrf
+        $template = preg_replace('/(?:\[csrf\]|\{#csrf\}|(?<!@)@csrf\b)/i', '<?= csrf_field() ?>', $template);
 
-        // @honeypot
-        $template = preg_replace('/(?<!@)@honeypot\b/i', '<?= honeypot_field() ?>', $template);
+        // Honeypot: [honeypot] or {#honeypot} or @honeypot
+        $template = preg_replace('/(?:\[honeypot\]|\{#honeypot\}|(?<!@)@honeypot\b)/i', '<?= honeypot_field() ?>', $template);
 
-        // @include('path.file') or @include('path.file', ['extra' => 'data'])
+        // Paginate: [paginate $items] or {#paginate $items} or @paginate($items)
+        $template = preg_replace_callback('/(?:\[paginate\s+(.+?)\]|\{#paginate\s+(.+?)\}|(?<!@)@paginate\s*\(\s*(.+?)\s*\);?)/i', function ($m) {
+            $var = trim($m[1] ?: ($m[2] ?: $m[3]));
+            return "<?= (is_object({$var}) && method_exists({$var}, 'links') ? ({$var})->links() : '') ?>";
+        }, $template);
+
+        // Include: [include 'file', ['key' => $val]] or {#include 'file'} or @include('file')
         $template = preg_replace_callback(
-            '/(?<!@)@include\s*\(\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*(.+?))?\s*\);?/i',
+            '/(?:\[include\s+[\'"]([^\'"]+)[\'"](?:\s*,\s*(.+?))?\s*\]|\{#include\s+[\'"]([^\'"]+)[\'"](?:\s*,\s*(.+?))?\s*\}|(?<!@)@include\s*\(\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*(.+?))?\s*\);?)/i',
             function ($m) {
-                $partial = addslashes($m[1]);
-                if (isset($m[2]) && trim($m[2]) !== '') {
-                    $extra = trim($m[2]);
-                    return "<?= \\Core\\View::renderPartial('{$partial}', array_merge(get_defined_vars(), (array)({$extra}))) ?>";
+                $file = addslashes($m[1] ?: ($m[3] ?: $m[5]));
+                $data = trim($m[2] ?: ($m[4] ?: ($m[6] ?? '')));
+                if ($data !== '') {
+                    return "<?= \\Core\\View::renderPartial('{$file}', array_merge(get_defined_vars(), (array)({$data}))) ?>";
                 }
-                return "<?= \\Core\\View::renderPartial('{$partial}', get_defined_vars()) ?>";
+                return "<?= \\Core\\View::renderPartial('{$file}', get_defined_vars()) ?>";
             },
             $template
         );
 
-        // @flash('key')
-        $template = preg_replace(
-            '/(?<!@)@flash\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?/i',
-            '<?php if ($flashMsg = flash(\'$1\')): ?><div class="alert alert-$1"><?= htmlspecialchars($flashMsg, ENT_QUOTES, \'UTF-8\') ?></div><?php endif; ?>',
+        // Flash: [flash 'key'] or {#flash 'key'} or @flash('key')
+        $template = preg_replace_callback(
+            '/(?:\[flash\s+[\'"]([^\'"]+)[\'"]\s*\]|\{#flash\s+[\'"]([^\'"]+)[\'"]\s*\}|(?<!@)@flash\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?)/i',
+            function ($m) {
+                $key = addslashes($m[1] ?: ($m[2] ?: $m[3]));
+                return "<?php if (\$flashMsg = flash('{$key}')): ?><div class=\"alert alert-{$key}\"><?= htmlspecialchars(\$flashMsg, ENT_QUOTES, 'UTF-8') ?></div><?php endif; ?>";
+            },
             $template
         );
 
-        // @if(condition) - Supports nested parentheses like @if(is_home()) or @if(!is_route('home'))
-        $template = preg_replace('/(?<!@)@if\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@elseif\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php elseif ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@else\b/i', '<?php else: ?>', $template);
-        $template = preg_replace('/(?<!@)@endif\b/i', '<?php endif; ?>', $template);
+        // 7. Control Flow Engine with Universal [end] / {end} Stack (Balanced PCRE Brackets)
+        $controlPattern = '/('
+            . '\[(if|elseif|each|for|while|unless|isset)\s+((?:[^\[\]]++|\[(?3)\])*)\]'
+            . '|\[(else|empty|end|endif|\/if|endeach|\/each|endfor|\/for|endwhile|\/while|endunless|\/unless|endisset|\/isset|endempty|\/empty)\]'
+            . '|\{#(if|each|for|while|unless|isset)\s+((?:[^{}]++|\{(?6)\})*)\}'
+            . '|\{:(elseif\s+[^{}]+|else|empty)\}'
+            . '|\{\/(if|each|for|while|unless|isset)\}'
+            . '|\{end\}'
+            . '|(?<!@)@(if|elseif|foreach|for|while|unless|isset|empty)\s*\(((?:[^()]++|\((?11)\))*)\)'
+            . '|(?<!@)@(else|endif|endforeach|endfor|endwhile|endunless|endisset|endempty)\b'
+            . ')/i';
 
-        // @foreach($items as $item)
-        $template = preg_replace('/(?<!@)@foreach\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php foreach ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@endforeach\b/i', '<?php endforeach; ?>', $template);
+        $stack = [];
+        $eachCounter = 0;
 
-        // @for(...)
-        $template = preg_replace('/(?<!@)@for\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php for ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@endfor\b/i', '<?php endfor; ?>', $template);
+        $template = preg_replace_callback($controlPattern, function ($m) use (&$stack, &$eachCounter) {
+            $full = $m[1];
 
-        // @isset($var)
-        $template = preg_replace('/(?<!@)@isset\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (isset($1)): ?>', $template);
-        $template = preg_replace('/(?<!@)@endisset\b/i', '<?php endif; ?>', $template);
+            // 1. [tag expr]
+            if (!empty($m[2])) {
+                $tag = strtolower($m[2]);
+                $expr = trim($m[3]);
+                if ($tag === 'if') {
+                    $stack[] = ['type' => 'if'];
+                    return "<?php if ({$expr}): ?>";
+                }
+                if ($tag === 'elseif') {
+                    return "<?php elseif ({$expr}): ?>";
+                }
+                if ($tag === 'each') {
+                    $eachCounter++;
+                    $var = "__srin_empty_" . $eachCounter;
+                    $stack[] = ['type' => 'each', 'has_empty' => false, 'empty_var' => $var];
+                    return "<?php \${$var} = true; foreach ({$expr}): \${$var} = false; ?>";
+                }
+                if ($tag === 'for') {
+                    $stack[] = ['type' => 'for'];
+                    return "<?php for ({$expr}): ?>";
+                }
+                if ($tag === 'while') {
+                    $stack[] = ['type' => 'while'];
+                    return "<?php while ({$expr}): ?>";
+                }
+                if ($tag === 'unless') {
+                    $stack[] = ['type' => 'unless'];
+                    return "<?php if (!({$expr})): ?>";
+                }
+                if ($tag === 'isset') {
+                    $stack[] = ['type' => 'isset'];
+                    return "<?php if (isset({$expr})): ?>";
+                }
+            }
 
-        // @empty($var)
-        $template = preg_replace('/(?<!@)@empty\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (empty($1)): ?>', $template);
-        $template = preg_replace('/(?<!@)@endempty\b/i', '<?php endif; ?>', $template);
+            // 2. [closing / standalone]
+            if (!empty($m[4])) {
+                $tag = strtolower($m[4]);
+                if ($tag === 'else') {
+                    return "<?php else: ?>";
+                }
+                if ($tag === 'empty') {
+                    if (!empty($stack) && end($stack)['type'] === 'each') {
+                        $top = count($stack) - 1;
+                        $stack[$top]['has_empty'] = true;
+                        $var = $stack[$top]['empty_var'];
+                        return "<?php endforeach; if (\${$var}): ?>";
+                    }
+                    return "<?php else: ?>";
+                }
+                // Closings: end, endif, /if, endeach, /each, etc.
+                if (!empty($stack)) {
+                    $closed = array_pop($stack);
+                    if ($closed['type'] === 'each') {
+                        return !empty($closed['has_empty']) ? "<?php endif; ?>" : "<?php endforeach; ?>";
+                    }
+                    if ($closed['type'] === 'for') return "<?php endfor; ?>";
+                    if ($closed['type'] === 'while') return "<?php endwhile; ?>";
+                    return "<?php endif; ?>";
+                }
+                return "<?php endif; ?>";
+            }
 
-        // @paginate($paginator)
-        $template = preg_replace('/(?<!@)@paginate\s*\(((?:[^()]++|\((?1)\))*)\);?/i', '<?= ($1)->links() ?>', $template);
+            // 3. {#tag expr}
+            if (!empty($m[5])) {
+                $tag = strtolower($m[5]);
+                $expr = trim($m[6]);
+                if ($tag === 'if') {
+                    $stack[] = ['type' => 'if'];
+                    return "<?php if ({$expr}): ?>";
+                }
+                if ($tag === 'each') {
+                    $eachCounter++;
+                    $var = "__srin_empty_" . $eachCounter;
+                    $stack[] = ['type' => 'each', 'has_empty' => false, 'empty_var' => $var];
+                    return "<?php \${$var} = true; foreach ({$expr}): \${$var} = false; ?>";
+                }
+            }
 
-        // @while(...)
-        $template = preg_replace('/(?<!@)@while\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php while ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@endwhile\b/i', '<?php endwhile; ?>', $template);
+            // 4. {:else} or {:empty} or {:elseif expr}
+            if (!empty($m[7])) {
+                $tag = strtolower(trim($m[7]));
+                if ($tag === 'else') return "<?php else: ?>";
+                if ($tag === 'empty') {
+                    if (!empty($stack) && end($stack)['type'] === 'each') {
+                        $top = count($stack) - 1;
+                        $stack[$top]['has_empty'] = true;
+                        $var = $stack[$top]['empty_var'];
+                        return "<?php endforeach; if (\${$var}): ?>";
+                    }
+                    return "<?php else: ?>";
+                }
+                if (str_starts_with($tag, 'elseif')) {
+                    $expr = trim(substr($tag, 6));
+                    return "<?php elseif ({$expr}): ?>";
+                }
+            }
 
-        // @unless(...)
-        $template = preg_replace('/(?<!@)@unless\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (!($1)): ?>', $template);
-        $template = preg_replace('/(?<!@)@endunless\b/i', '<?php endif; ?>', $template);
+            // 5. {/tag} or {end}
+            if (!empty($m[8]) || $full === '{end}') {
+                if (!empty($stack)) {
+                    $closed = array_pop($stack);
+                    if ($closed['type'] === 'each') {
+                        return !empty($closed['has_empty']) ? "<?php endif; ?>" : "<?php endforeach; ?>";
+                    }
+                    return "<?php endif; ?>";
+                }
+                return "<?php endif; ?>";
+            }
+
+            // 6. @tag(expr)
+            if (!empty($m[9])) {
+                $tag = strtolower($m[9]);
+                $expr = trim($m[10]);
+                if ($tag === 'if') {
+                    $stack[] = ['type' => 'if'];
+                    return "<?php if ({$expr}): ?>";
+                }
+                if ($tag === 'elseif') return "<?php elseif ({$expr}): ?>";
+                if ($tag === 'foreach') {
+                    $eachCounter++;
+                    $var = "__srin_empty_" . $eachCounter;
+                    $stack[] = ['type' => 'each', 'has_empty' => false, 'empty_var' => $var];
+                    return "<?php \${$var} = true; foreach ({$expr}): \${$var} = false; ?>";
+                }
+                if ($tag === 'for') {
+                    $stack[] = ['type' => 'for'];
+                    return "<?php for ({$expr}): ?>";
+                }
+                if ($tag === 'while') {
+                    $stack[] = ['type' => 'while'];
+                    return "<?php while ({$expr}): ?>";
+                }
+                if ($tag === 'unless') {
+                    $stack[] = ['type' => 'unless'];
+                    return "<?php if (!({$expr})): ?>";
+                }
+                if ($tag === 'isset') {
+                    $stack[] = ['type' => 'isset'];
+                    return "<?php if (isset({$expr})): ?>";
+                }
+            }
+
+            // 7. @else / @endif / @endforeach
+            if (!empty($m[11])) {
+                $tag = strtolower($m[11]);
+                if ($tag === 'else') return "<?php else: ?>";
+                if ($tag === 'empty') {
+                    if (!empty($stack) && end($stack)['type'] === 'each') {
+                        $top = count($stack) - 1;
+                        $stack[$top]['has_empty'] = true;
+                        $var = $stack[$top]['empty_var'];
+                        return "<?php endforeach; if (\${$var}): ?>";
+                    }
+                    return "<?php else: ?>";
+                }
+                if (!empty($stack)) {
+                    $closed = array_pop($stack);
+                    if ($closed['type'] === 'each') {
+                        return !empty($closed['has_empty']) ? "<?php endif; ?>" : "<?php endforeach; ?>";
+                    }
+                    if ($closed['type'] === 'for') return "<?php endfor; ?>";
+                    if ($closed['type'] === 'while') return "<?php endwhile; ?>";
+                    return "<?php endif; ?>";
+                }
+                return "<?php endif; ?>";
+            }
+
+            return $full;
+        }, $template);
 
         // 8. Restore escaped tokens as literal
         if (!empty($escapedTokens)) {
@@ -328,12 +457,6 @@ class View
             '%%ESCAPED_AT_CONTENT%%'            => '@content',
             '%%ESCAPED_AT_CONTENTCONNECT%%'     => '@contentConnect',
             '%%ESCAPED_AT_CONNECTCONTENT%%'     => '@connectContent',
-            '%%ESCAPED_AT_CONTENTCCONNECT%%'    => '@contentCconnect',
-            '%%ESCAPED_AT_CONNECTCCONNECT%%'    => '@connectCcontent',
-            '%%ESCAPED_AT_ENDCONTENTCONNECT%%'  => '@endContentConnect',
-            '%%ESCAPED_AT_ENDCONNECTCONTENT%%'  => '@endconnectContent',
-            '%%ESCAPED_AT_ENDCONTENTCCONNECT%%' => '@endContentCconnect',
-            '%%ESCAPED_AT_ENDCONNECTCCONNECT%%' => '@endconnectCcontent',
             '%%ESCAPED_AT_CSRF%%'               => '@csrf',
             '%%ESCAPED_AT_HONEYPOT%%'           => '@honeypot',
             '%%ESCAPED_AT_FLASH%%'              => '@flash',
