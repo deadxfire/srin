@@ -195,7 +195,6 @@ phpsystem/
 │
 ├── srin                    # Srin CLI executable (cross-platform)
 ├── srin.php                # Srin CLI PHP entry (php srin.php)
-├── srin.bat                # Windows command shortcut for Srin CLI
 ├── index.php               # Single public entry point
 ├── .htaccess               # Apache clean URL rewrites & security cloaking
 ├── .env.example            # Environment variables blueprint
@@ -229,7 +228,7 @@ Only `.srin.php` template files inside `Pages/` are executed. Standard `.php` te
 
 ## 🛠️ Srin CLI Generator Commands (`php srin`)
 
-Run `php srin` (or `php srin.php`, or simply `srin` on Windows) to generate controllers, pages, layouts, and error templates:
+Run `php srin` (or `php srin.php`) to generate controllers, pages, layouts, and error templates:
 
 ```bash
 # 1. Start development server
