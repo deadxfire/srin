@@ -113,61 +113,101 @@ class View
 
     /**
      * Compile lightweight template directives.
+     * Enforces strict XSS escaping on all {{ $expression }} outputs.
      */
     protected static function compileDirectives(string $template): string
     {
-        // 1. Temporarily protect escaped directives (@@Connect, @@include, @@csrf, @@title, @@flash, @@content, @{{assets...}}, @{{route...}}, @{{url...}})
+        // 1. Strip secure template comments: {{-- anything --}}
+        $template = preg_replace('/\{\{--.*?--\}\}/s', '', $template);
+
+        // 2. Temporarily protect escaped braces: @{{ ... }} or @{!! ... !!} (for Vue.js, Alpine, React)
         $escapedTokens = [];
-        $template = preg_replace_callback('/@(\{\{\s*(?:assets?|route|url)\s*\(.+?\)\s*\}\})/i', function ($m) use (&$escapedTokens) {
+        $template = preg_replace_callback('/@(\{\{.*?\}\}|\{!!.*?!!\})/s', function ($m) use (&$escapedTokens) {
             $token = '%%ESCAPED_BRACES_' . count($escapedTokens) . '%%';
-            $escapedTokens[$token] = $m[1];
+            $escapedTokens[$token] = $m[1]; // Store literal brace content without '@'
             return $token;
         }, $template);
 
+        // 3. Temporarily protect escaped directives (@@Connect, @@csrf, @@honeypot, @@if, etc.)
         $escaped = [
-            '@@Connect' => '%%ESCAPED_AT_CONNECT%%',
-            '@@connect' => '%%ESCAPED_AT_CONNECT%%',
-            '@@title'   => '%%ESCAPED_AT_TITLE%%',
-            '@@include' => '%%ESCAPED_AT_INCLUDE%%',
-            '@@content' => '%%ESCAPED_AT_CONTENT%%',
-            '@@csrf'    => '%%ESCAPED_AT_CSRF%%',
-            '@@flash'   => '%%ESCAPED_AT_FLASH%%',
+            '@@Connect'    => '%%ESCAPED_AT_CONNECT%%',
+            '@@connect'    => '%%ESCAPED_AT_CONNECT%%',
+            '@@title'      => '%%ESCAPED_AT_TITLE%%',
+            '@@include'    => '%%ESCAPED_AT_INCLUDE%%',
+            '@@content'    => '%%ESCAPED_AT_CONTENT%%',
+            '@@csrf'       => '%%ESCAPED_AT_CSRF%%',
+            '@@honeypot'   => '%%ESCAPED_AT_HONEYPOT%%',
+            '@@flash'      => '%%ESCAPED_AT_FLASH%%',
+            '@@if'         => '%%ESCAPED_AT_IF%%',
+            '@@elseif'     => '%%ESCAPED_AT_ELSEIF%%',
+            '@@else'       => '%%ESCAPED_AT_ELSE%%',
+            '@@endif'      => '%%ESCAPED_AT_ENDIF%%',
+            '@@foreach'    => '%%ESCAPED_AT_FOREACH%%',
+            '@@endforeach' => '%%ESCAPED_AT_ENDFOREACH%%',
+            '@@for'        => '%%ESCAPED_AT_FOR%%',
+            '@@endfor'     => '%%ESCAPED_AT_ENDFOR%%',
+            '@@isset'      => '%%ESCAPED_AT_ISSET%%',
+            '@@endisset'   => '%%ESCAPED_AT_ENDISSET%%',
+            '@@empty'      => '%%ESCAPED_AT_EMPTY%%',
+            '@@endempty'   => '%%ESCAPED_AT_ENDEMPTY%%',
         ];
         $template = strtr($template, $escaped);
 
-        // 2. Compile real directives
-        // {{assets('/css/style.css')}} or {{asset('images/photo.png')}}
+        // 4. Raw / unescaped output: {!! $expression !!}
+        $template = preg_replace('/\{!!\s*(.+?)\s*!!\}/s', '<?= $1 ?>', $template);
+
+        // 5. Built-in safe directive helpers (URLs and HTML fields)
         $template = preg_replace(
             '/\{\{\s*assets?\s*\(\s*([\'"][^\'"]+[\'"])\s*\)\s*\}\}/i',
             '<?= assets($1) ?>',
             $template
         );
 
-        // {{route('name')}} or {{route('name', ['id' => 5])}}
         $template = preg_replace(
             '/\{\{\s*route\s*\(\s*(.+?)\s*\)\s*\}\}/i',
             '<?= route($1) ?>',
             $template
         );
 
-        // {{url('/path')}}
         $template = preg_replace(
             '/\{\{\s*url\s*\(\s*([\'"][^\'"]+[\'"])\s*\)\s*\}\}/i',
             '<?= url($1) ?>',
             $template
         );
 
-        // @include('partials/nav') or @include('nav')
         $template = preg_replace(
-            '/(?<!@)@include\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?/i',
-            '<?= \Core\View::renderPartial(\'$1\', get_defined_vars()) ?>',
+            '/\{\{\s*csrf_field\s*\(\s*\)\s*\}\}/i',
+            '<?= csrf_field() ?>',
             $template
         );
 
-        // @csrf
         $template = preg_replace(
-            '/(?<!@)@csrf\b/i',
-            '<?= csrf_field() ?>',
+            '/\{\{\s*honeypot_field\s*\(\s*\)\s*\}\}/i',
+            '<?= honeypot_field() ?>',
+            $template
+        );
+
+        // 6. Generic {{ $expression }} -> Auto-escaped with htmlspecialchars for bulletproof XSS protection!
+        $template = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($m) {
+            $expr = trim($m[1]);
+            if ($expr === '') {
+                return '{{ }}';
+            }
+            $expr = rtrim($expr, ';');
+            return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
+        }, $template);
+
+        // 7. Security & Template Directives:
+        // @csrf
+        $template = preg_replace('/(?<!@)@csrf\b/i', '<?= csrf_field() ?>', $template);
+
+        // @honeypot
+        $template = preg_replace('/(?<!@)@honeypot\b/i', '<?= honeypot_field() ?>', $template);
+
+        // @include('partials/nav')
+        $template = preg_replace(
+            '/(?<!@)@include\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?/i',
+            '<?= \Core\View::renderPartial(\'$1\', get_defined_vars()) ?>',
             $template
         );
 
@@ -178,18 +218,53 @@ class View
             $template
         );
 
-        // 3. Restore escaped directives as literal
+        // @if(condition)
+        $template = preg_replace('/(?<!@)@if\s*\((.+?)\)/i', '<?php if ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@elseif\s*\((.+?)\)/i', '<?php elseif ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@else\b/i', '<?php else: ?>', $template);
+        $template = preg_replace('/(?<!@)@endif\b/i', '<?php endif; ?>', $template);
+
+        // @foreach($items as $item)
+        $template = preg_replace('/(?<!@)@foreach\s*\((.+?)\)/i', '<?php foreach ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@endforeach\b/i', '<?php endforeach; ?>', $template);
+
+        // @for(...)
+        $template = preg_replace('/(?<!@)@for\s*\((.+?)\)/i', '<?php for ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@endfor\b/i', '<?php endfor; ?>', $template);
+
+        // @isset($var)
+        $template = preg_replace('/(?<!@)@isset\s*\((.+?)\)/i', '<?php if (isset($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@endisset\b/i', '<?php endif; ?>', $template);
+
+        // @empty($var)
+        $template = preg_replace('/(?<!@)@empty\s*\((.+?)\)/i', '<?php if (empty($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@endempty\b/i', '<?php endif; ?>', $template);
+
+        // 8. Restore escaped tokens as literal
         if (!empty($escapedTokens)) {
             $template = strtr($template, $escapedTokens);
         }
 
         $unEscape = [
-            '%%ESCAPED_AT_CONNECT%%' => '@Connect',
-            '%%ESCAPED_AT_TITLE%%'   => '@title',
-            '%%ESCAPED_AT_INCLUDE%%' => '@include',
-            '%%ESCAPED_AT_CONTENT%%' => '@content',
-            '%%ESCAPED_AT_CSRF%%'    => '@csrf',
-            '%%ESCAPED_AT_FLASH%%'   => '@flash',
+            '%%ESCAPED_AT_CONNECT%%'    => '@Connect',
+            '%%ESCAPED_AT_TITLE%%'      => '@title',
+            '%%ESCAPED_AT_INCLUDE%%'    => '@include',
+            '%%ESCAPED_AT_CONTENT%%'    => '@content',
+            '%%ESCAPED_AT_CSRF%%'       => '@csrf',
+            '%%ESCAPED_AT_HONEYPOT%%'   => '@honeypot',
+            '%%ESCAPED_AT_FLASH%%'      => '@flash',
+            '%%ESCAPED_AT_IF%%'         => '@if',
+            '%%ESCAPED_AT_ELSEIF%%'     => '@elseif',
+            '%%ESCAPED_AT_ELSE%%'       => '@else',
+            '%%ESCAPED_AT_ENDIF%%'      => '@endif',
+            '%%ESCAPED_AT_FOREACH%%'    => '@foreach',
+            '%%ESCAPED_AT_ENDFOREACH%%' => '@endforeach',
+            '%%ESCAPED_AT_FOR%%'        => '@for',
+            '%%ESCAPED_AT_ENDFOR%%'     => '@endfor',
+            '%%ESCAPED_AT_ISSET%%'      => '@isset',
+            '%%ESCAPED_AT_ENDISSET%%'   => '@endisset',
+            '%%ESCAPED_AT_EMPTY%%'      => '@empty',
+            '%%ESCAPED_AT_ENDEMPTY%%'   => '@endempty',
         ];
         $template = strtr($template, $unEscape);
 

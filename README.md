@@ -204,14 +204,26 @@ phpsystem/
 
 ---
 
-## 🔒 Enterprise-Grade Security Model
+## 🔒 Enterprise-Grade Security & Anti-Hacking Defenses
 
-Like Laravel, Srin Engine enforces strict access boundaries to protect your codebase and server:
+Like Laravel, Srin Engine enforces strict access boundaries and defense-in-depth protections to defeat common and advanced web attack vectors:
 
-### 1. 404 Cloaking for Core & Internal Files
+### 1. XSS (Cross-Site Scripting) Defense on `{{ }}`
+All expressions evaluated inside `{{ $expression }}` are automatically sanitized using `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Any injected HTML or `<script>` tags are neutralized before reaching the browser. Raw unescaped output is strictly quarantined to `{!! $trustedHtml !!}`.
+
+### 2. Bulletproof CSRF Protection for Forms
+Every form submission is protected using cryptographically random session tokens via `@csrf` or `{{ csrf_field() }}`. Verified using timing-attack-safe `hash_equals()`; expired tokens automatically render a custom HTTP 419 error page with safe token regeneration.
+
+### 3. Invisible Anti-Bot Honeypot (`@honeypot`)
+Block automated spam bots on contact and inquiry forms without slow, intrusive CAPTCHAs. Real users never see the invisible field; bots fill it and get rejected immediately.
+
+### 4. Rate Limiting & DoS / Brute-Force Throttling
+Defend endpoints against flood attacks with `$this->rateLimit('contact-form', 5, 60)`. When limits are exceeded, requests cleanly abort with HTTP 429 Too Many Requests.
+
+### 5. 404 Cloaking for Core & Internal Files
 Direct HTTP access to internal code files (e.g. `http://localhost:8000/core/App.php`, `/Config/mail.php`, `/Pages/welcome.srin.php`, or `.env`) **always returns HTTP 404 Not Found** with your custom 404 error page, instead of a revealing 403 Forbidden. Attackers cannot discover whether files exist or probe your internal directory structure.
 
-### 2. Download File Isolation (Strictly from `assets/`)
+### 6. Download File Isolation (Strictly from `assets/`)
 Downloadable files are strictly restricted to the `assets/` directory (e.g. `assets/downloads/`):
 ```php
 // In a Controller:
@@ -221,8 +233,54 @@ return download('catalog.pdf', 'Company_Catalog.pdf');
 ```
 - Attempting to download from `Pages/`, `Core/`, `Config/`, or traversing directories (`../../etc/passwd`) is immediately blocked and **throws a 404 error**.
 
-### 3. Strict Template Extension (`.srin.php`)
+### 7. Strict Template Extension (`.srin.php`)
 Only `.srin.php` template files inside `Pages/` are executed. Standard `.php` templates (e.g. `Pages/portfolio.php`) are strictly rejected.
+
+---
+
+## 🎨 Running PHP in Templates: `{{ }}` Syntax & `@Connect`
+
+Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
+
+```html
+<!-- Display Variables & Auto-Escaped Expressions (XSS-Safe) -->
+<h1>{{ $title }}</h1>
+<p>Today is {{ date('F j, Y') }}</p>
+<p>Copyright &copy; {{ date('Y') }} {{ config('name') }}</p>
+
+<!-- Form with Complete Anti-Hacking Protection -->
+<form action="{{route('contact.send')}}" method="POST">
+    @csrf       <!-- CSRF security token field -->
+    @honeypot   <!-- Invisible anti-bot spam trap -->
+
+    <input type="text" name="name" value="{{ old('name') }}" placeholder="Your Name" required>
+    <input type="email" name="email" value="{{ old('email') }}" placeholder="Your Email" required>
+    <textarea name="message" placeholder="Your Message">{{ old('message') }}</textarea>
+    <button type="submit">Send Message</button>
+</form>
+
+<!-- Raw / Unescaped HTML (only when explicitly intended) -->
+<div>{!! $rawHtml !!}</div>
+
+<!-- Secure Template Comments (completely omitted from browser source) -->
+{{-- This comment will never show up in browser inspect element --}}
+
+<!-- Frontend JavaScript Escaping (Vue.js / Alpine.js / React) -->
+<span>@{{ vueData }}</span> <!-- Compiles literally to {{ vueData }} -->
+```
+
+### Control Flow Directives:
+```html
+@if(count($items) > 0)
+    <ul>
+    @foreach($items as $item)
+        <li>{{ $item['name'] }}</li>
+    @endforeach
+    </ul>
+@else
+    <p>No items found.</p>
+@endif
+```
 
 ---
 

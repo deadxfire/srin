@@ -310,26 +310,57 @@ class PortfolioController extends BaseController
 
                     <!-- 6. Pages & Layouts -->
                     <section id="templates" class="doc-card">
-                        <h2>6. <code>.srin.php</code> Templates &amp; <code>@Connect</code> Layouts</h2>
+                        <h2>6. <code>.srin.php</code> Templates, <code>&#123;&#123; &#125;&#125;</code> Syntax &amp; <code>@Connect</code></h2>
                         <div class="highlight-box">
                             <strong>Strict Template Format:</strong> All views, layouts, and partials in Srin Engine <strong>must use the <code>.srin.php</code> extension</strong> (e.g. <code>Pages/portfolio.srin.php</code>). Standard <code>.php</code> files (like <code>Pages/portfolio.php</code>) are intentionally rejected and will not work.
                         </div>
 
-                        <h3>Page Template (e.g. <code>Pages/home.srin.php</code>):</h3>
-                        <pre><code>@@Connect('layouts/main')
-@@title('Welcome to Our Site')
+                        <h3>Running PHP Code via <code>&#123;&#123; &#125;&#125;</code> (Auto-Escaped &amp; XSS-Safe):</h3>
+                        <p>Whenever you need to run PHP code or display data inside any <code>.srin.php</code> template, use <code>&#123;&#123; &#125;&#125;</code>. Srin Engine automatically passes all outputs through <code>htmlspecialchars()</code> with <code>ENT_QUOTES</code> for complete defense against XSS:</p>
+                        <pre><code>&lt;!-- Variables &amp; Expressions --&gt;
+&lt;h1&gt;Welcome, @{{ \$name }}!&lt;/h1&gt;
+&lt;p&gt;Copyright &copy; @{{ date('Y') }} @{{ config('name') }}&lt;/p&gt;
+&lt;span&gt;Total Items: @{{ count(\$projects) }}&lt;/span&gt;
 
-&lt;section class="hero"&gt;
-    &lt;h1&gt;Hello World&lt;/h1&gt;
-    &lt;p&gt;This content automatically slots into the master layout.&lt;/p&gt;
-&lt;/section&gt;</code></pre>
+&lt;!-- Safe Asset &amp; Route Linking --&gt;
+&lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
+&lt;a href="@{{route('home')}}"&gt;Home&lt;/a&gt;
+
+&lt;!-- Raw HTML (when unescaped output is explicitly intended) --&gt;
+&lt;div&gt;@{!! \$trustedHtml !!}&lt;/div&gt;
+
+&lt;!-- Secure Comments (stripped completely from client output) --&gt;
+@{{-- This comment is never visible in page source --}}
+
+&lt;!-- Frontend JS Framework Escaping (Vue / Alpine / React) --&gt;
+&lt;span&gt;@@{{ clientVar }}&lt;/span&gt; &lt;!-- Renders literally as @{{ clientVar }} --&gt;</code></pre>
+
+                        <h3>Secure Form Directives:</h3>
+                        <pre><code>&lt;form action="@{{route('contact.send')}}" method="POST"&gt;
+    @@csrf       &lt;!-- Injects CSRF token protection --&gt;
+    @@honeypot   &lt;!-- Injects invisible bot trap to block spam bots --&gt;
+
+    &lt;input type="text" name="name" value="@{{ old('name') }}" required&gt;
+    &lt;input type="email" name="email" value="@{{ old('email') }}" required&gt;
+    &lt;button type="submit"&gt;Send Message&lt;/button&gt;
+&lt;/form&gt;</code></pre>
+
+                        <h3>Control Flow Directives:</h3>
+                        <pre><code>@@if(count(\$projects) &gt; 0)
+    @@foreach(\$projects as \$project)
+        &lt;div class="card"&gt;@{{ \$project['title'] }}&lt;/div&gt;
+    @@endforeach
+@@else
+    &lt;p&gt;No projects found.&lt;/p&gt;
+@@endif</code></pre>
 
                         <h3>Master Layout (e.g. <code>Pages/layouts/main.srin.php</code>):</h3>
                         <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
-    &lt;title&gt;&lt;?= $title ?? config('name') ?&gt;&lt;/title&gt;
-    &lt;link rel="stylesheet" href="{{assets('/css/style.css')}}"&gt;
+    &lt;title&gt;@{{ \$title ?? config('name') }}&lt;/title&gt;
+    &lt;link rel="icon" type="image/svg+xml" href="@{{assets('/favicon.svg')}}"&gt;
+    &lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
 &lt;/head&gt;
 &lt;body&gt;
     &lt;main class="container"&gt;
@@ -337,20 +368,9 @@ class PortfolioController extends BaseController
         @@flash('error')
         @@content
     &lt;/main&gt;
-    &lt;script src="{{assets('/js/main.js')}}"&gt;&lt;/script&gt;
+    &lt;script src="@{{assets('/js/main.js')}}"&gt;&lt;/script&gt;
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
-
-                        <h3>Directives Summary:</h3>
-                        <ul class="feature-bullets">
-                            <li><code>{{assets('/css/...')}}</code>: Direct asset URL linking to <code>assets/</code> folder.</li>
-                            <li><code>@@Connect('layouts/main')</code>: Connects the page to a master layout.</li>
-                            <li><code>@@title('Your Title')</code>: Sets the page title variable.</li>
-                            <li><code>@@content</code>: Where the page HTML is injected inside the layout.</li>
-                            <li><code>@@include('partials/name')</code>: Reusable component include from <code>Pages/partials/</code>.</li>
-                            <li><code>@@csrf</code>: Generates hidden CSRF input field for forms.</li>
-                            <li><code>@@flash('success')</code>: Displays session flash notifications.</li>
-                        </ul>
                     </section>
 
                     <!-- 7. Defining Routes -->
@@ -493,41 +513,70 @@ if (!isAuthorized()) {
 
                     <!-- 11. Enterprise Security & Downloads -->
                     <section id="security" class="doc-card">
-                        <h2>11. Enterprise Security &amp; Downloadable Files</h2>
-                        <p>Srin enforces strict directory isolation and defense-in-depth security inspired by Laravel to protect your core code and sensitive assets.</p>
+                        <h2>11. Enterprise Security &amp; Anti-Hacking Defenses</h2>
+                        <p>Srin Engine enforces a comprehensive, defense-in-depth security model to defeat common and advanced web attack vectors:</p>
 
                         <div class="highlight-box">
-                            🔒 <strong>Strict Direct-Access Lock:</strong> All internal directories (<code>Controller/</code>, <code>Core/</code>, <code>Config/</code>, <code>Pages/</code>, <code>Routes/</code>, <code>Others/</code>) and sensitive files (<code>.env</code>, <code>composer.json</code>, <code>srin</code>) are completely blocked from web browsers, immediately routing to the 404 error page.
+                            🔒 <strong>Multi-Layer Defense Matrix:</strong> Built-in protection against Cross-Site Scripting (XSS), CSRF, Bot Flooding, Rate Limiting / Brute-Force, Parameter Pollution, Path Traversal, and HTTP Response Splitting.
                         </div>
 
-                        <h3>Downloadable Files Rules:</h3>
+                        <h3>Comprehensive Hacking Defenses:</h3>
                         <ul class="feature-bullets">
-                            <li><strong>Must Reside in <code>assets/</code>:</strong> All downloadable files (PDFs, ZIPs, documents, brochures, catalogs) must be stored inside the <code>assets/</code> directory (e.g. <code>assets/downloads/</code>).</li>
-                            <li><strong><code>Pages/</code> Cannot Be Used for Downloads:</strong> Attempting to store or access downloadable files inside <code>Pages/</code> will <strong>not work</strong>. The <code>Pages/</code> directory is strictly reserved for server-rendered view templates and is completely blocked from direct HTTP file retrieval.</li>
+                            <li>
+                                <strong>1. XSS (Cross-Site Scripting) Defense:</strong>
+                                All <code>&#123;&#123; $expr &#125;&#125;</code> statements are automatically compiled with <code>htmlspecialchars(..., ENT_QUOTES, 'UTF-8')</code>. Any injected <code>&lt;script&gt;</code> tags or HTML attributes are completely neutralized.
+                            </li>
+                            <li>
+                                <strong>2. CSRF (Cross-Site Request Forgery) Defense:</strong>
+                                Forms are secured using cryptographically secure tokens via <code>@@csrf</code> (or <code>&#123;&#123; csrf_field() &#125;&#125;</code>). Validated using timing-safe <code>hash_equals()</code>; failed tokens cleanly trigger HTTP <code>419 Page Expired</code>.
+                            </li>
+                            <li>
+                                <strong>3. Automated Bot &amp; Spam Trap (Honeypot):</strong>
+                                Add <code>@@honeypot</code> to forms. An invisible CSS-hidden input traps automated spam bots while real humans never see it. Verify with <code>\$this-&gt;validateHoneypot()</code>.
+                            </li>
+                            <li>
+                                <strong>4. Rate Limiting &amp; Brute-Force / DoS Protection:</strong>
+                                Throttle endpoint submissions using <code>\$this-&gt;rateLimit('contact-form', 5, 60)</code>. Exceeded attempts automatically abort with HTTP <code>429 Too Many Requests</code>.
+                            </li>
+                            <li>
+                                <strong>5. Array Injection &amp; Mass Assignment Defense:</strong>
+                                Use <code>Request::string('field')</code> to prevent type-juggling attacks, and <code>Request::only(['name', 'email'])</code> to strictly whitelist allowed inputs.
+                            </li>
+                            <li>
+                                <strong>6. CRLF Injection &amp; Response Splitting Defense:</strong>
+                                <code>Response::redirect()</code> and internal headers automatically strip <code>\r</code> and <code>\n</code> carriage return sequences to prevent header injection.
+                            </li>
+                            <li>
+                                <strong>7. 404 Cloaking for Core &amp; Config Files:</strong>
+                                Direct HTTP access to <code>/core/App.php</code>, <code>/Config/mail.php</code>, <code>/Pages/welcome.srin.php</code>, or <code>.env</code> always returns HTTP 404 (cloaking your file structure from attackers).
+                            </li>
+                            <li>
+                                <strong>8. Download Isolation:</strong>
+                                All downloadable files must reside strictly in <code>assets/</code> (e.g. <code>assets/downloads/</code>). Downloads from <code>Pages/</code> or core folders are blocked with 404.
+                            </li>
                         </ul>
 
-                        <h3>Linking to Downloads in Templates:</h3>
-                        <pre><code>&lt;!-- Direct download link from assets/downloads/ --&gt;
-&lt;a href="@{{assets('/downloads/brochure.pdf')}}" download&gt;Download Brochure (PDF)&lt;/a&gt;
-&lt;a href="@{{assets('/downloads/portfolio.zip')}}" download&gt;Download Portfolio (ZIP)&lt;/a&gt;</code></pre>
+                        <h3>Secure Controller Implementation Example:</h3>
+                        <pre><code>// In Controller/ContactController.php:
+public function sendMail()
+{
+    // 1. Defeat brute force / DoS:
+    \$this-&gt;rateLimit('contact-form', 5, 60);
 
-                        <h3>Secure Programmatic Download via Controller / Route:</h3>
-                        <pre><code>// In a Controller:
-return \$this-&gt;download('downloads/brochure.pdf', 'Company-Brochure.pdf');
+    // 2. Defeat CSRF attacks:
+    \$this-&gt;validateCsrf();
 
-// In a Route Closure:
-Router::get('/download/catalog', function() {
-    download('downloads/catalog.pdf', 'Official-Catalog.pdf');
-});</code></pre>
+    // 3. Defeat automated spam bots:
+    \$this-&gt;validateHoneypot();
 
-                        <h3>Laravel-Grade Security Features:</h3>
-                        <ul class="feature-bullets">
-                            <li><strong>Single Entry Point:</strong> All HTTP requests funnel strictly through <code>index.php</code>.</li>
-                            <li><strong>Automatic Security Headers:</strong> Every response emits <code>X-Frame-Options: SAMEORIGIN</code>, <code>X-Content-Type-Options: nosniff</code>, <code>X-XSS-Protection</code>, and <code>Referrer-Policy</code>.</li>
-                            <li><strong>Session Hardening:</strong> Sessions are pre-configured with <code>cookie_httponly</code>, <code>use_only_cookies</code>, and HTTPS detection.</li>
-                            <li><strong>Path Traversal Defense:</strong> Resolvers use <code>realpath()</code> checks to prevent <code>../</code> directory escape attacks.</li>
-                            <li><strong>CSRF Token System:</strong> Form submissions are protected using <code>@csrf</code> and <code>csrf_verify()</code>.</li>
-                        </ul>
+    // 4. Defeat parameter pollution:
+    \$inputs = \$this-&gt;onlyInputs(['name', 'email', 'message']);
+    \$errors = \$this-&gt;validate(\$inputs, [
+        'name'    =&gt; 'required|min:2|max:100',
+        'email'   =&gt; 'required|email',
+        'message' =&gt; 'required|min:10|max:5000',
+    ]);
+}</code></pre>
                     </section>
 
                     <!-- 12. Global Helpers -->

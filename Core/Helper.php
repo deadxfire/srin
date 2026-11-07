@@ -2,6 +2,7 @@
 
 use Core\View;
 use Core\Response;
+use Core\Security;
 
 if (!function_exists('env')) {
     /**
@@ -195,15 +196,7 @@ if (!function_exists('csrf_token')) {
      */
     function csrf_token(): string
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        if (empty($_SESSION['_csrf_token'])) {
-            $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
-        }
-
-        return $_SESSION['_csrf_token'];
+        return Security::csrfToken();
     }
 }
 
@@ -213,7 +206,7 @@ if (!function_exists('csrf_field')) {
      */
     function csrf_field(): string
     {
-        return '<input type="hidden" name="_csrf" value="' . htmlspecialchars(csrf_token(), ENT_QUOTES, 'UTF-8') . '">';
+        return Security::csrfField();
     }
 }
 
@@ -223,14 +216,37 @@ if (!function_exists('csrf_verify')) {
      */
     function csrf_verify(?string $token = null): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
+        return Security::verifyCsrf($token);
+    }
+}
 
-        $token = $token ?? ($_POST['_csrf'] ?? '');
-        $stored = $_SESSION['_csrf_token'] ?? '';
+if (!function_exists('honeypot_field')) {
+    /**
+     * Generate invisible anti-bot honeypot field.
+     */
+    function honeypot_field(string $name = '_srin_hp_check'): string
+    {
+        return Security::honeypotField($name);
+    }
+}
 
-        return !empty($stored) && hash_equals($stored, $token);
+if (!function_exists('honeypot_verify')) {
+    /**
+     * Verify honeypot was left blank (human check).
+     */
+    function honeypot_verify(string $name = '_srin_hp_check'): bool
+    {
+        return Security::verifyHoneypot($name);
+    }
+}
+
+if (!function_exists('rate_limit')) {
+    /**
+     * Check rate limit for an action.
+     */
+    function rate_limit(string $key, int $max = 5, int $decaySeconds = 60): bool
+    {
+        return Security::rateLimit($key, $max, $decaySeconds);
     }
 }
 

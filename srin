@@ -123,22 +123,26 @@ class {$cleanName} extends BaseController
     }
 
     /**
-     * Handle incoming contact / mail transfer.
+     * Handle incoming contact / mail transfer with full anti-hacking defenses.
      */
     public function sendMail()
     {
-        // 1. Verify CSRF Token
-        if (!csrf_verify()) {
-            flash('error', 'Security session expired. Please resubmit the form.');
-            return \$this->redirect('/{$baseName}');
-        }
+        // 1. Rate Limiting: Max 5 submissions per minute per IP (prevents DoS & form flooding)
+        \$this->rateLimit('contact-form', 5, 60);
 
-        // 2. Validate input fields
-        \$errors = \$this->validate([
-            'name'    => 'required|min:2',
+        // 2. Verify CSRF Token (prevents Cross-Site Request Forgery)
+        \$this->validateCsrf();
+
+        // 3. Verify Honeypot field (silently traps and drops automated spam bots)
+        \$this->validateHoneypot();
+
+        // 4. Validate & sanitize inputs
+        \$inputs = \$this->allInputs();
+        \$errors = \$this->validate(\$inputs, [
+            'name'    => 'required|min:2|max:100',
             'email'   => 'required|email',
-            'subject' => 'required|min:3',
-            'message' => 'required|min:10',
+            'subject' => 'required|min:3|max:150',
+            'message' => 'required|min:10|max:5000',
         ]);
 
         if (!empty(\$errors)) {
@@ -146,20 +150,20 @@ class {$cleanName} extends BaseController
             return \$this->redirect('/{$baseName}');
         }
 
-        // 3. Dispatch email using Core\Mailer (configured in Config/mail.php)
+        // 5. Dispatch email using Core\Mailer (configured in Config/mail.php)
         try {
             Mailer::send([
                 'to'         => config('mail.from.address', 'admin@example.com'),
-                'subject'    => '[Contact Form] ' . Request::input('subject'),
+                'subject'    => '[Contact Form] ' . Request::string('subject'),
                 'body'       => sprintf(
                     "<h3>New Inquiry Received</h3><p><strong>Name:</strong> %s</p><p><strong>Email:</strong> %s</p><p><strong>Message:</strong><br>%s</p>",
-                    htmlspecialchars(Request::input('name')),
-                    htmlspecialchars(Request::input('email')),
-                    nl2br(htmlspecialchars(Request::input('message')))
+                    htmlspecialchars(Request::string('name'), ENT_QUOTES, 'UTF-8'),
+                    htmlspecialchars(Request::string('email'), ENT_QUOTES, 'UTF-8'),
+                    nl2br(htmlspecialchars(Request::string('message'), ENT_QUOTES, 'UTF-8'))
                 ),
                 'is_html'    => true,
-                'reply_to'   => Request::input('email'),
-                'reply_name' => Request::input('name'),
+                'reply_to'   => Request::string('email'),
+                'reply_name' => Request::string('name'),
             ]);
 
             flash('success', 'Your message has been sent successfully!');

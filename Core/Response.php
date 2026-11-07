@@ -33,8 +33,9 @@ class Response
     public static function redirect(string $url, int $statusCode = 302): void
     {
         self::status($statusCode);
+        $cleanUrl = Security::cleanUrl($url);
         if (!headers_sent()) {
-            header("Location: {$url}");
+            header("Location: {$cleanUrl}");
         }
         exit;
     }
