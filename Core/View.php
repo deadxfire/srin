@@ -199,18 +199,32 @@ class View
         $template = preg_replace('/\{\{--.*?--\}\}/s', '', $template);
         $template = preg_replace('/\[--.*?--\]/s', '', $template);
 
-        // 2. Temporarily protect escaped braces: @{{ ... }} or @{!! ... !!} (for Vue.js, Alpine, React)
+        // 2. Temporarily protect escaped braces/brackets: @{{ ... }}, @{!! ... !!}, @[[ ... ]], @[{ ... }]
         $escapedTokens = [];
-        $template = preg_replace_callback('/@(\{\{.*?\}\}|\{!!.*?!!\})/s', function ($m) use (&$escapedTokens) {
-            $token = '%%ESCAPED_BRACES_' . count($escapedTokens) . '%%';
-            $escapedTokens[$token] = $m[1]; // Store literal brace content without '@'
+        $template = preg_replace_callback('/@(\{\{.*?\}\}|\{!!.*?!!\}|\[\[.*?\]\]|\[\{.*?\}\])/s', function ($m) use (&$escapedTokens) {
+            $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
+            $escapedTokens[$token] = $m[1]; // Store literal content without '@'
             return $token;
         }, $template);
 
-        // 3. Raw / unescaped output: {!! $expression !!}
+        // 3. Raw / unescaped HTML output: [{ $expression }] (Srin standard) or {!! $expression !!}
+        $template = preg_replace('/\[\{\s*(.+?)\s*\}\]/s', '<?= $1 ?>', $template);
         $template = preg_replace('/\{!!\s*(.+?)\s*!!\}/s', '<?= $1 ?>', $template);
 
-        // 4. Built-in safe directive helpers in {{ }} (assets, route, url, csrf_field, honeypot_field)
+        // 4. Double brackets safe output: [[ $expression ]] (Srin standard)
+        $template = preg_replace_callback('/\[\[\s*(.+?)\s*\]\]/s', function ($m) {
+            $expr = trim($m[1]);
+            if ($expr === '') {
+                return '[[ ]]';
+            }
+            $expr = rtrim($expr, ';');
+            if (preg_match('/^(?:assets?|route|url|csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
+                return "<?= {$expr} ?>";
+            }
+            return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
+        }, $template);
+
+        // 4b. Curly braces safe output: {{ $expression }} (Backward compatibility)
         $template = preg_replace_callback('/\{\{\s*([^{}]+?)\s*\}\}/', function ($m) {
             $expr = trim($m[1]);
             if ($expr === '') {

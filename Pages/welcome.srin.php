@@ -1246,24 +1246,29 @@ class ArticleController extends BaseController
                                         <td>Renders invisible anti-bot honeypot input field to trap automated spam bots.</td>
                                     </tr>
                                     <tr>
+                                        <td><code>[[ \$expression ]]</code></td>
+                                        <td><code>[[ \$article-&gt;title ]]</code></td>
+                                        <td>Srin Double-Bracket: Evaluates PHP and auto-escapes output with <code>htmlspecialchars</code>. Zero Vue/Alpine collision!</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>[{ \$trustedHtml }]</code></td>
+                                        <td><code>[{ \$article-&gt;body }]</code></td>
+                                        <td>Srin HTML Compile: Renders raw, unescaped HTML content (for trusted rich text editors, markdown).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>[-- comment --]</code></td>
+                                        <td><code>[-- Internal notes --]</code></td>
+                                        <td>Server-side comment, completely stripped and omitted from HTML source code.</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>@{{ \$expression }}</code></td>
                                         <td><code>@{{ \$article-&gt;title }}</code></td>
-                                        <td>Evaluates PHP and automatically escapes output with <code>htmlspecialchars</code> (XSS-safe).</td>
+                                        <td>Backward-compatible classic curly brace syntax also fully supported.</td>
                                     </tr>
                                     <tr>
                                         <td><code>@{!! \$trustedHtml !!}</code></td>
                                         <td><code>@{!! \$article-&gt;body !!}</code></td>
-                                        <td>Renders raw, unescaped HTML content (for trusted rich text editors).</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>@{{-- comment --}}</code></td>
-                                        <td><code>@{{-- Internal developer notes --}}</code></td>
-                                        <td>Server-side comment, completely stripped and omitted from HTML source code.</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>@@@{{ clientVar }}</code></td>
-                                        <td><code>@@@{{ vueCount }}</code></td>
-                                        <td>Escapes braces for frontend JavaScript frameworks (Vue.js, Alpine.js, React).</td>
+                                        <td>Backward-compatible classic raw output syntax.</td>
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
