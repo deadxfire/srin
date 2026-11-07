@@ -142,6 +142,30 @@ class Request
     }
 
     /**
+     * Get an uploaded file from $_FILES.
+     */
+    public static function file(string $key): ?array
+    {
+        return $_FILES[$key] ?? null;
+    }
+
+    /**
+     * Get all uploaded files from $_FILES.
+     */
+    public static function files(): array
+    {
+        return $_FILES ?? [];
+    }
+
+    /**
+     * Check if request has a valid uploaded file.
+     */
+    public static function hasFile(string $key): bool
+    {
+        return isset($_FILES[$key]) && is_array($_FILES[$key]) && ($_FILES[$key]['error'] === UPLOAD_ERR_OK) && !empty($_FILES[$key]['tmp_name']);
+    }
+
+    /**
      * Check if request is POST.
      */
     public static function isPost(): bool

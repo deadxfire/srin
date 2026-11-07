@@ -153,6 +153,70 @@ class BaseController
     }
 
     /**
+     * Get an uploaded file from the request.
+     */
+    protected function file(string $key): ?array
+    {
+        return Request::file($key);
+    }
+
+    /**
+     * Get all uploaded files from the request.
+     */
+    protected function files(): array
+    {
+        return Request::files();
+    }
+
+    /**
+     * Check if request has a valid uploaded file.
+     */
+    protected function hasFile(string $key): bool
+    {
+        return Request::hasFile($key);
+    }
+
+    /**
+     * Move an uploaded file safely to target directory (defaults to assets/uploads).
+     * Generates a collision-resistant filename and validates extensions.
+     * Returns the relative path on success, or null on failure.
+     */
+    protected function storeFile(string $key, string $destinationDir = 'assets/uploads', array $allowedExtensions = []): ?string
+    {
+        if (!$this->hasFile($key)) {
+            return null;
+        }
+
+        $file = $this->file($key);
+        $originalName = (string) ($file['name'] ?? '');
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+
+        if (!empty($allowedExtensions)) {
+            $allowed = array_map('strtolower', $allowedExtensions);
+            if (!in_array($ext, $allowed, true)) {
+                return null;
+            }
+        }
+
+        $baseDir = dirname(__DIR__);
+        $cleanDir = trim(str_replace(['\\', '../', '..\\'], ['/', '', ''], $destinationDir), '/');
+        $targetPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $cleanDir);
+
+        if (!is_dir($targetPath)) {
+            mkdir($targetPath, 0755, true);
+        }
+
+        $safeName = bin2hex(random_bytes(16)) . ($ext !== '' ? '.' . $ext : '');
+        $destination = $targetPath . DIRECTORY_SEPARATOR . $safeName;
+
+        if (move_uploaded_file($file['tmp_name'], $destination)) {
+            return $cleanDir . '/' . $safeName;
+        }
+
+        return null;
+    }
+
+    /**
      * Check if request is AJAX / Fetch.
      */
     protected function isAjax(): bool
