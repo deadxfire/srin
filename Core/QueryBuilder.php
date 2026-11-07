@@ -22,10 +22,43 @@ class QueryBuilder
     protected ?int $offsetValue = null;
     protected ?string $modelClass = null;
 
+    /**
+     * Whitelist of safe comparison operators for WHERE conditions.
+     */
+    protected const ALLOWED_OPERATORS = [
+        '=', '!=', '<>', '<', '>', '<=', '>=',
+        'LIKE', 'NOT LIKE', 'ILIKE', 'REGEXP'
+    ];
+
     public function __construct(string $table, ?string $modelClass = null)
     {
         $this->table = $table;
         $this->modelClass = $modelClass;
+    }
+
+    /**
+     * Wrap and sanitize column/table identifiers to prevent SQL identifier injection.
+     */
+    protected function wrap(string $value): string
+    {
+        $value = trim($value);
+
+        if ($value === '*' || str_contains($value, '(') || stripos($value, ' as ') !== false) {
+            return $value;
+        }
+
+        $parts = explode('.', str_replace(['`', '"', "'", ';', '--'], '', $value));
+        $wrapped = array_map(fn($part) => '`' . trim($part) . '`', $parts);
+        return implode('.', $wrapped);
+    }
+
+    /**
+     * Sanitize operator against allowed whitelist.
+     */
+    protected function cleanOperator(mixed $operator): string
+    {
+        $op = strtoupper(trim((string) $operator));
+        return in_array($op, self::ALLOWED_OPERATORS, true) ? $op : '=';
     }
 
     /**
@@ -51,7 +84,7 @@ class QueryBuilder
             'type'     => 'basic',
             'boolean'  => 'AND',
             'column'   => $column,
-            'operator' => strtoupper((string) $operator),
+            'operator' => $this->cleanOperator($operator),
             'value'    => $value,
         ];
 
@@ -73,7 +106,7 @@ class QueryBuilder
             'type'     => 'basic',
             'boolean'  => 'OR',
             'column'   => $column,
-            'operator' => strtoupper((string) $operator),
+            'operator' => $this->cleanOperator($operator),
             'value'    => $value,
         ];
 
@@ -141,7 +174,7 @@ class QueryBuilder
     public function orderBy(string $column, string $direction = 'ASC'): self
     {
         $dir = strtoupper($direction) === 'DESC' ? 'DESC' : 'ASC';
-        $this->orders[] = "{$column} {$dir}";
+        $this->orders[] = $this->wrap($column) . " {$dir}";
         return $this;
     }
 
@@ -184,8 +217,10 @@ class QueryBuilder
      */
     protected function toSql(): string
     {
-        $cols = implode(', ', $this->columns);
-        $sql = "SELECT {$cols} FROM `{$this->table}`";
+        $wrappedCols = array_map([$this, 'wrap'], $this->columns);
+        $cols = implode(', ', $wrappedCols);
+        $table = $this->wrap($this->table);
+        $sql = "SELECT {$cols} FROM {$table}";
 
         if (!empty($this->wheres)) {
             $sql .= ' WHERE ' . $this->buildWheres();
@@ -220,23 +255,24 @@ class QueryBuilder
 
         foreach ($this->wheres as $i => $w) {
             $prefix = ($i === 0) ? '' : $w['boolean'] . ' ';
+            $column = $this->wrap($w['column']);
 
             switch ($w['type']) {
                 case 'basic':
-                    $clauses[] = "{$prefix}`{$w['column']}` {$w['operator']} ?";
+                    $clauses[] = "{$prefix}{$column} {$w['operator']} ?";
                     break;
 
                 case 'in':
                     $placeholders = implode(', ', array_fill(0, count($w['values']), '?'));
-                    $clauses[] = "{$prefix}`{$w['column']}` IN ({$placeholders})";
+                    $clauses[] = "{$prefix}{$column} IN ({$placeholders})";
                     break;
 
                 case 'null':
-                    $clauses[] = "{$prefix}`{$w['column']}` IS NULL";
+                    $clauses[] = "{$prefix}{$column} IS NULL";
                     break;
 
                 case 'not_null':
-                    $clauses[] = "{$prefix}`{$w['column']}` IS NOT NULL";
+                    $clauses[] = "{$prefix}{$column} IS NOT NULL";
                     break;
 
                 case 'raw':
@@ -313,12 +349,14 @@ class QueryBuilder
         }
 
         $columns = array_keys($values);
+        $cleanCols = array_map(fn($c) => '`' . str_replace(['`', '"', "'", ';', '--'], '', (string) $c) . '`', $columns);
         $placeholders = array_fill(0, count($columns), '?');
 
-        $colsSql = '`' . implode('`, `', $columns) . '`';
+        $colsSql = implode(', ', $cleanCols);
         $placeholdersSql = implode(', ', $placeholders);
+        $table = $this->wrap($this->table);
 
-        $sql = "INSERT INTO `{$this->table}` ({$colsSql}) VALUES ({$placeholdersSql})";
+        $sql = "INSERT INTO {$table} ({$colsSql}) VALUES ({$placeholdersSql})";
         if (Database::getDriver() === 'pgsql') {
             $sql = str_replace('`', '"', $sql);
         }
@@ -339,17 +377,19 @@ class QueryBuilder
         $bindings = [];
 
         foreach ($values as $col => $val) {
-            $sets[] = "`{$col}` = ?";
+            $cleanCol = str_replace(['`', '"', "'", ';', '--'], '', (string) $col);
+            $sets[] = "`{$cleanCol}` = ?";
             $bindings[] = $val;
         }
 
         $setSql = implode(', ', $sets);
         $whereSql = !empty($this->wheres) ? ' WHERE ' . $this->buildWheres() : '';
+        $table = $this->wrap($this->table);
 
         // Combine update bindings with where bindings
         $allBindings = array_merge($bindings, $this->bindings);
 
-        $sql = "UPDATE `{$this->table}` SET {$setSql}{$whereSql}";
+        $sql = "UPDATE {$table} SET {$setSql}{$whereSql}";
         if (Database::getDriver() === 'pgsql') {
             $sql = str_replace('`', '"', $sql);
         }
@@ -363,7 +403,8 @@ class QueryBuilder
     public function delete(): int
     {
         $whereSql = !empty($this->wheres) ? ' WHERE ' . $this->buildWheres() : '';
-        $sql = "DELETE FROM `{$this->table}`{$whereSql}";
+        $table = $this->wrap($this->table);
+        $sql = "DELETE FROM {$table}{$whereSql}";
         if (Database::getDriver() === 'pgsql') {
             $sql = str_replace('`', '"', $sql);
         }
@@ -371,3 +412,4 @@ class QueryBuilder
         return Database::delete($sql, $this->bindings);
     }
 }
+
