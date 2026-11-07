@@ -485,6 +485,47 @@ class Article extends Model
     // Attributes guarded from mass-assignment
     protected array \$guarded = ['id', 'views'];
 }</code></pre>
+
+                        <h3>6. Model Relationships &amp; Eager Loading (<code>hasMany</code>, <code>belongsTo</code>, <code>hasOne</code>):</h3>
+                        <p>Models support expressive relationships with built-in lazy loading, batch eager loading (defeating the N+1 database problem), and automatic nested serialization:</p>
+
+                        <pre><code>// Defining Relationships in Models:
+class User extends Model
+{
+    public function posts()
+    {
+        return \$this-&gt;hasMany(Post::class); // Has-Many
+    }
+
+    public function profile()
+    {
+        return \$this-&gt;hasOne(Profile::class); // Has-One
+    }
+}
+
+class Post extends Model
+{
+    public function user()
+    {
+        return \$this-&gt;belongsTo(User::class); // Belongs-To Inverse
+    }
+}
+
+// 1. Create related records through relations (automatically sets foreign key):
+\$user = User::find(1);
+\$post = \$user-&gt;posts()-&gt;create(['title' =&gt; 'First Post', 'content' =&gt; 'Hello!']);
+
+// 2. Dynamic property access (Lazy-loaded and cached in memory):
+foreach (\$user-&gt;posts as \$p) {
+    echo \$p-&gt;title;
+}
+echo \$post-&gt;user-&gt;name;
+
+// 3. Batch Eager Loading (Solves the N+1 query problem):
+\$users = User::with('posts', 'profile')-&gt;get();
+
+// 4. Automatic nested JSON/Array serialization:
+\$data = \$users[0]-&gt;toArray(); // Includes 'posts' and 'profile' arrays</code></pre>
                     </section>
 
                     <!-- 6. Controllers -->

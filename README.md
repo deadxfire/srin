@@ -521,6 +521,70 @@ $array = $article->toArray();
 $json  = $article->toJson();
 ```
 
+### 6. Model Relationships & Eager Loading (`hasMany`, `belongsTo`, `hasOne`)
+
+Srin Engine features an elegant relationship engine with full **lazy loading**, **eager loading** (to eliminate N+1 queries), and **relation persistence**:
+
+```php
+namespace Model;
+
+use Core\Model;
+
+class User extends Model
+{
+    // One-to-Many: A user has many posts
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    // One-to-One: A user has one profile
+    public function profile()
+    {
+        return $this->hasOne(Profile::class);
+    }
+}
+
+class Post extends Model
+{
+    // Inverse: A post belongs to a user
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
+}
+```
+
+#### Working with Relationships:
+
+```php
+use Model\User;
+use Model\Post;
+
+// 1. Create related records through the relationship (automatically sets user_id!)
+$user = User::find(1);
+$post = $user->posts()->create([
+    'title'   => 'My New Post',
+    'content' => 'Building fast PHP apps with Srin Engine',
+]);
+
+// 2. Dynamic Property Access (Lazy Loading with memoization)
+$posts = $user->posts;        // Array of Post instances
+echo $post->user->name;       // BelongsTo inverse relationship
+
+// 3. Eager Loading (Eliminates the N+1 database query problem!)
+$users = User::with('posts', 'profile')->get();
+
+foreach ($users as $u) {
+    echo $u->name . ' has ' . count($u->posts) . ' posts.';
+    echo ' Bio: ' . ($u->profile->bio ?? 'No bio');
+}
+
+// 4. Serialization automatically nests loaded relations in arrays & JSON
+$userArray = $users[0]->toArray();
+$userJson  = $users[0]->toJson();
+```
+
 #### Using Models in Controllers:
 
 ```php
