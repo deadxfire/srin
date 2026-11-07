@@ -1,0 +1,39 @@
+# ==============================================================================
+# Rinswa Engine - Web Server Security & Routing Rules (.htaccess)
+# Developed by Arindam Makar
+# ==============================================================================
+
+# 1. Disable Directory Browsing / Indexing
+Options -Indexes +FollowSymLinks
+
+# 2. Character Encoding
+AddDefaultCharset UTF-8
+
+# 3. Security Headers (Defense-in-depth like Laravel)
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header unset X-Powered-By
+</IfModule>
+
+# 4. Map Errors to index.php so 404 is always rendered
+ErrorDocument 403 /index.php
+ErrorDocument 404 /index.php
+
+# 5. Routing & Core File Cloaking
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Allow direct HTTP access ONLY for existing static/downloadable files inside assets/
+    RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # Route ALL other requests to index.php
+    # Direct access to /core/App.php, /Config/app.php, /Pages/welcome.rinswa.php, etc.
+    # will be processed by index.php -> Router -> Response::renderError(404)!
+    RewriteRule ^ index.php [L,QSA]
+</IfModule>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="srinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1d4ed8"/>
+      <stop offset="50%" stop-color="#2563eb"/>
+      <stop offset="100%" stop-color="#0284c7"/>
+    </linearGradient>
+    <linearGradient id="innerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#e0f2fe"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#0f172a" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="url(#srinGrad)" filter="url(#glow)"/>
+  <rect x="8" y="8" width="112" height="112" rx="28" fill="none" stroke="#60a5fa" stroke-width="2" stroke-opacity="0.4"/>
+
+  <!-- Code bracket left '<' -->
+  <path d="M38 46 L26 64 L38 82" fill="none" stroke="#93c5fd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+
+  <!-- Code bracket right '>' -->
+  <path d="M90 46 L102 64 L90 82" fill="none" stroke="#93c5fd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+
+  <!-- Srin Monogram 'S' -->
+  <path d="M74 46 C74 40 68 36 60 36 C52 36 46 40 46 46 C46 53 52 56 64 60 C77 64 84 69 84 79 C84 90 74 96 61 96 C47 96 40 89 39 80 L49 79 C50 85 54 88 61 88 C67 88 73 85 73 79 C73 72 67 69 55 65 C43 61 36 56 36 46 C36 36 46 28 60 28 C74 28 83 35 84 46 Z" fill="url(#innerGrad)"/>
+</svg>

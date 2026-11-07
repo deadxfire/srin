@@ -1,0 +1,58 @@
+{
+    "name": "deadxfire/srin",
+    "description": "Srin - Lightweight, Secure Core PHP Static Website Engine developed by Arindam Makar",
+    "type": "project",
+    "keywords": [
+        "srin",
+        "deadxfire",
+        "core-php",
+        "static-site",
+        "framework",
+        "mailer",
+        "arindam-makar"
+    ],
+    "homepage": "https://github.com/deadxfire/srin",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Arindam Makar",
+            "homepage": "https://github.com/deadxfire",
+            "role": "Creator & Lead Architect"
+        }
+    ],
+    "support": {
+        "source": "https://github.com/deadxfire/srin"
+    },
+    "require": {
+        "php": ">=8.1",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "autoload": {
+        "psr-4": {
+            "Controller\\": "Controller/",
+            "Core\\": "Core/",
+            "Config\\": "Config/"
+        },
+        "files": [
+            "Core/Helper.php"
+        ]
+    },
+    "config": {
+        "vendor-dir": "Others",
+        "optimize-autoloader": true,
+        "sort-packages": true,
+        "process-timeout": 0
+    },
+    "bin": [
+        "srin",
+        "srin.php"
+    ],
+    "scripts": {
+        "srin": "php srin",
+        "serve": "php srin serve",
+        "routes": "php srin routes",
+        "post-create-project-cmd": [
+            "@php -r \"echo PHP_EOL . '========================================================' . PHP_EOL . '              Srin Engine Installed!                    ' . PHP_EOL . '            Developed by Arindam Makar                  ' . PHP_EOL . '        GitHub: https://github.com/deadxfire            ' . PHP_EOL . '========================================================' . PHP_EOL . 'To start your local server, run:' . PHP_EOL . '  php srin serve' . PHP_EOL . PHP_EOL;\""
+        ]
+    }
+}

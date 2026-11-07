@@ -1,0 +1,10 @@
+# Environment variables
+.env
+
+# Mail logs
+Others/logs/*.log
+
+# IDE files
+.vscode/
+.idea/
+

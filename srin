@@ -1,0 +1,644 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * ============================================================================
+ * Srin Engine CLI Tool (srin)
+ * ============================================================================
+ * Developed by Arindam Makar
+ * Command line utility to generate controllers, pages, error pages, and manage the system.
+ */
+
+// Ensure this is run from CLI
+if (php_sapi_name() !== 'cli') {
+    die("This tool can only be run from the command line.\n");
+}
+
+define('SRIN_SECURE', true);
+
+$baseDir = __DIR__;
+$arguments = array_slice($argv, 1);
+$command = $arguments[0] ?? 'help';
+
+// Color formatting helpers for terminal
+function color(string $text, string $color): string {
+    $colors = [
+        'green'  => "\033[32m",
+        'red'    => "\033[31m",
+        'yellow' => "\033[33m",
+        'blue'   => "\033[34m",
+        'cyan'   => "\033[36m",
+        'bold'   => "\033[1m",
+        'reset'  => "\033[0m",
+    ];
+
+    return ($colors[$color] ?? '') . $text . ($colors['reset'] ?? '');
+}
+
+switch ($command) {
+    case 'make:controller':
+        handleMakeController($arguments, $baseDir);
+        break;
+
+    case 'make:page':
+        handleMakePage($arguments, $baseDir);
+        break;
+
+    case 'make:layout':
+        handleMakeLayout($arguments, $baseDir);
+        break;
+
+    case 'make:error':
+        handleMakeError($arguments, $baseDir);
+        break;
+
+    case 'routes':
+    case 'route:list':
+        handleListRoutes($baseDir);
+        break;
+
+    case 'clear:logs':
+        handleClearLogs($baseDir);
+        break;
+
+    case 'serve':
+        handleServe($arguments);
+        break;
+
+    case 'help':
+    case 'list':
+    default:
+        showHelp();
+        break;
+}
+
+/**
+ * Handle make:controller command.
+ */
+function handleMakeController(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+    $hasMailFlag = in_array('--mail', $args);
+
+    if (!$name) {
+        echo color("\n[!] Please specify a controller name.\n", 'yellow');
+        echo "Usage: php srin make:controller <Name> [--mail]\n";
+        echo "Example: php srin make:controller ContactController --mail\n\n";
+        return;
+    }
+
+    $cleanName = preg_replace('/[^a-zA-Z0-9_]/', '', $name);
+    if (!str_ends_with($cleanName, 'Controller')) {
+        $cleanName .= 'Controller';
+    }
+
+    $controllerPath = $baseDir . "/Controller/{$cleanName}.php";
+
+    if (file_exists($controllerPath)) {
+        echo color("\n[X] Error: Controller [{$cleanName}] already exists at Controller/{$cleanName}.php\n\n", 'red');
+        return;
+    }
+
+    $baseName = strtolower(str_replace('Controller', '', $cleanName));
+
+    if ($hasMailFlag) {
+        $template = <<<PHP
+<?php
+
+namespace Controller;
+
+use Core\Mailer;
+use Core\Request;
+
+class {$cleanName} extends BaseController
+{
+    /**
+     * Display the {$baseName} form or page.
+     */
+    public function index()
+    {
+        return \$this->render('{$baseName}', [
+            'title' => '{$cleanName}'
+        ]);
+    }
+
+    /**
+     * Handle incoming contact / mail transfer.
+     */
+    public function sendMail()
+    {
+        // 1. Verify CSRF Token
+        if (!csrf_verify()) {
+            flash('error', 'Security session expired. Please resubmit the form.');
+            return \$this->redirect('/{$baseName}');
+        }
+
+        // 2. Validate input fields
+        \$errors = \$this->validate([
+            'name'    => 'required|min:2',
+            'email'   => 'required|email',
+            'subject' => 'required|min:3',
+            'message' => 'required|min:10',
+        ]);
+
+        if (!empty(\$errors)) {
+            flash('error', reset(\$errors));
+            return \$this->redirect('/{$baseName}');
+        }
+
+        // 3. Dispatch email using Core\Mailer (configured in Config/mail.php)
+        try {
+            Mailer::send([
+                'to'         => config('mail.from.address', 'admin@example.com'),
+                'subject'    => '[Contact Form] ' . Request::input('subject'),
+                'body'       => sprintf(
+                    "<h3>New Inquiry Received</h3><p><strong>Name:</strong> %s</p><p><strong>Email:</strong> %s</p><p><strong>Message:</strong><br>%s</p>",
+                    htmlspecialchars(Request::input('name')),
+                    htmlspecialchars(Request::input('email')),
+                    nl2br(htmlspecialchars(Request::input('message')))
+                ),
+                'is_html'    => true,
+                'reply_to'   => Request::input('email'),
+                'reply_name' => Request::input('name'),
+            ]);
+
+            flash('success', 'Your message has been sent successfully!');
+        } catch (\Throwable \$e) {
+            flash('error', 'Failed to send message: ' . \$e->getMessage());
+        }
+
+        return \$this->redirect('/{$baseName}');
+    }
+}
+PHP;
+    } else {
+        $template = <<<PHP
+<?php
+
+namespace Controller;
+
+class {$cleanName} extends BaseController
+{
+    /**
+     * Display the index view.
+     */
+    public function index()
+    {
+        return \$this->render('{$baseName}', [
+            'title' => '{$cleanName} Page'
+        ]);
+    }
+}
+PHP;
+    }
+
+    file_put_contents($controllerPath, $template);
+
+    echo color("\n[✓] Controller created successfully!", 'green') . "\n";
+    echo "  Location: " . color("Controller/{$cleanName}.php", 'cyan') . "\n";
+
+    echo color("\nNext Step: Register route in Routes/web.php:\n", 'yellow');
+    if ($hasMailFlag) {
+        echo color("  Router::get('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n", 'bold');
+        echo color("  Router::post('/{$baseName}', '{$cleanName}@sendMail')->name('{$baseName}.send');\n\n", 'bold');
+    } else {
+        echo color("  Router::get('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n\n", 'bold');
+    }
+}
+
+/**
+ * Handle make:page command.
+ */
+function handleMakePage(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a page name.\n", 'yellow');
+        echo "Usage: php srin make:page <name>\n";
+        echo "Example: php srin make:page about\n\n";
+        return;
+    }
+
+    $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9_\-\/]/', '', $name));
+    $cleanName = trim($cleanName, '/');
+    $pagePath = $baseDir . "/Pages/{$cleanName}.srin.php";
+
+    if (file_exists($pagePath)) {
+        echo color("\n[X] Error: Page [{$cleanName}] already exists at Pages/{$cleanName}.srin.php\n\n", 'red');
+        return;
+    }
+
+    $pageDir = dirname($pagePath);
+    if (!is_dir($pageDir)) {
+        @mkdir($pageDir, 0777, true);
+    }
+
+    $title = ucwords(str_replace(['-', '_', '/'], ' ', $cleanName));
+
+    $template = <<<HTML
+@Connect('layouts/main')
+@title('{$title}')
+
+<div class="content-box">
+    <h1>{$title}</h1>
+    <p class="lead">Welcome to your new {$cleanName} page.</p>
+    <hr>
+    <p>Add your static HTML or PHP content here. It automatically slots into <code>Pages/layouts/main.srin.php</code>.</p>
+</div>
+HTML;
+
+    file_put_contents($pagePath, $template);
+
+    // If default layout Pages/layouts/main.srin.php does not exist yet, create it automatically
+    $mainLayoutPath = $baseDir . '/Pages/layouts/main.srin.php';
+    if (!file_exists($mainLayoutPath)) {
+        $layoutDir = dirname($mainLayoutPath);
+        if (!is_dir($layoutDir)) {
+            @mkdir($layoutDir, 0777, true);
+        }
+        $mainLayoutTemplate = <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars(\$title ?? config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?></title>
+    <!-- Default Srin Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
+    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
+    <!-- Connect your CSS directly using {{assets('/css/style.css')}} -->
+    <link rel="stylesheet" href="{{assets('/css/style.css')}}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container nav-container">
+            <a href="<?= url('/') ?>" class="brand-logo">
+                <span class="logo-accent">&lt;/&gt;</span> <?= htmlspecialchars(config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?>
+            </a>
+            <nav class="nav-links">
+                <a href="<?= url('/') ?>">Home</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="page-content">
+        <div class="container">
+            @flash('success')
+            @flash('error')
+            @content
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container footer-container">
+            <p>&copy; <?= date('Y') ?> <?= htmlspecialchars(config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?>. Developed by <?= htmlspecialchars(config('developer', 'Arindam Makar'), ENT_QUOTES, 'UTF-8') ?>.</p>
+        </div>
+    </footer>
+    <!-- Connect your JS directly using {{assets('/js/main.js')}} -->
+    <script src="{{assets('/js/main.js')}}"></script>
+</body>
+</html>
+HTML;
+        file_put_contents($mainLayoutPath, $mainLayoutTemplate);
+        echo "  Created Layout: " . color("Pages/layouts/main.srin.php", 'yellow') . "\n";
+    }
+
+    echo color("\n[✓] Page created successfully!", 'green') . "\n";
+    echo "  Location: " . color("Pages/{$cleanName}.srin.php", 'cyan') . "\n";
+    echo "  Connected Layout: " . color("layouts/main", 'yellow') . "\n\n";
+}
+
+/**
+ * Handle make:layout command.
+ */
+function handleMakeLayout(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a layout name.\n", 'yellow');
+        echo "Usage: php srin make:layout <name>\n";
+        echo "Example: php srin make:layout admin\n\n";
+        return;
+    }
+
+    $cleanName = strtolower(preg_replace('/[^a-zA-Z0-9_\-]/', '', $name));
+    $layoutPath = $baseDir . "/Pages/layouts/{$cleanName}.srin.php";
+
+    if (file_exists($layoutPath)) {
+        echo color("\n[X] Error: Layout [{$cleanName}] already exists at Pages/layouts/{$cleanName}.srin.php\n\n", 'red');
+        return;
+    }
+
+    $title = ucwords(str_replace(['-', '_'], ' ', $cleanName));
+
+    $template = <<<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= htmlspecialchars(\$title ?? '{$title}', ENT_QUOTES, 'UTF-8') ?></title>
+    <!-- Default Srin Favicon -->
+    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
+    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
+    <!-- Connect your CSS directly using {{assets('/css/style.css')}} -->
+    <link rel="stylesheet" href="{{assets('/css/style.css')}}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="container">
+            <h2>{$title} Layout</h2>
+        </div>
+    </header>
+
+    <main class="page-content">
+        <div class="container">
+            @flash('success')
+            @flash('error')
+            <!-- Page content is injected here: -->
+            @content
+        </div>
+    </main>
+
+    <!-- Connect your JS directly using {{assets('/js/main.js')}} -->
+    <script src="{{assets('/js/main.js')}}"></script>
+</body>
+</html>
+HTML;
+
+    $dir = dirname($layoutPath);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+    }
+
+    file_put_contents($layoutPath, $template);
+
+    echo color("\n[✓] Layout created successfully!", 'green') . "\n";
+    echo "  Location: " . color("Pages/layouts/{$cleanName}.srin.php", 'cyan') . "\n";
+    echo "  Usage in page: " . color("@Connect('layouts/{$cleanName}')\n\n", 'yellow');
+}
+
+/**
+ * Handle make:error command.
+ */
+function handleMakeError(array $args, string $baseDir): void
+{
+    $code = $args[1] ?? null;
+
+    if (!$code) {
+        echo color("\n[!] Error: Please provide an HTTP error number (e.g. 404, 500, 403).\n", 'red');
+        echo "Example: " . color("php srin make:error 404\n\n", 'yellow');
+        exit(1);
+    }
+
+    $code = (int) $code;
+    if ($code < 100 || $code > 599) {
+        echo color("\n[!] Error: Invalid HTTP status code. Must be between 100 and 599.\n\n", 'red');
+        exit(1);
+    }
+
+    $statusPhrases = [
+        400 => 'Bad Request',
+        401 => 'Unauthorized',
+        403 => 'Forbidden',
+        404 => 'Page Not Found',
+        405 => 'Method Not Allowed',
+        408 => 'Request Timeout',
+        419 => 'Page Expired',
+        422 => 'Unprocessable Entity',
+        429 => 'Too Many Requests',
+        500 => 'Internal Server Error',
+        502 => 'Bad Gateway',
+        503 => 'Service Unavailable',
+        504 => 'Gateway Timeout',
+    ];
+
+    $statusText = $statusPhrases[$code] ?? 'Error';
+    $errorsDir = $baseDir . '/Pages/errors';
+
+    if (!is_dir($errorsDir)) {
+        mkdir($errorsDir, 0755, true);
+    }
+
+    $filePath = $errorsDir . '/' . $code . '.srin.php';
+
+    if (file_exists($filePath)) {
+        echo color("\n[!] Error: Error template Pages/errors/{$code}.srin.php already exists.\n\n", 'yellow');
+        exit(1);
+    }
+
+    $template = <<<HTML
+@title('{$code} - {$statusText}')
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><?= \$title ?? '{$code} - {$statusText}' ?></title>
+    <!-- Connect assets directly with {{assets('/css/style.css')}} -->
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0b0f19;
+            color: #f8fafc;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .error-card {
+            background: #111827;
+            border: 1px solid #1f2937;
+            border-radius: 16px;
+            max-width: 540px;
+            width: 100%;
+            padding: 44px 32px;
+            text-align: center;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+        .error-badge {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 5rem;
+            font-weight: 800;
+            line-height: 1;
+            color: #ef4444;
+            margin-bottom: 12px;
+            letter-spacing: -2px;
+        }
+        h1 {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-bottom: 12px;
+        }
+        p.error-desc {
+            color: #94a3b8;
+            font-size: 1.05rem;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .btn-home {
+            display: inline-block;
+            background: #2563eb;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 12px 28px;
+            border-radius: 8px;
+            transition: background 0.2s;
+        }
+        .btn-home:hover {
+            background: #1d4ed8;
+        }
+        .dev-badge {
+            margin-top: 24px;
+            font-size: 0.8rem;
+            color: #64748b;
+        }
+        .dev-badge strong {
+            color: #94a3b8;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <div class="error-badge">{$code}</div>
+        <h1><?= \$statusText ?? '{$statusText}' ?></h1>
+        <p class="error-desc"><?= \$message ?? '{$statusText}' ?></p>
+        <a href="<?= url('/') ?>" class="btn-home">&larr; Return to Home</a>
+        <div class="dev-badge">
+            Srin Engine &bull; Developed by <strong>Arindam Makar</strong>
+        </div>
+    </div>
+</body>
+</html>
+HTML;
+
+    file_put_contents($filePath, $template);
+
+    echo color("\n[✓] Error page created successfully!\n", 'green');
+    echo "  Location: " . color("Pages/errors/{$code}.srin.php\n", 'bold');
+    echo color("  Srin will now automatically use this custom design for HTTP {$code} errors.\n\n", 'cyan');
+}
+
+/**
+ * Handle listing all routes.
+ */
+function handleListRoutes(string $baseDir): void
+{
+    // Autoload routes
+    require_once $baseDir . '/Others/autoload.php';
+
+    $routesFile = $baseDir . '/Routes/web.php';
+    if (!file_exists($routesFile)) {
+        echo color("\n[X] Routes/web.php file not found.\n\n", 'red');
+        return;
+    }
+
+    require_once $routesFile;
+
+    $routes = \Core\Router::getRoutes();
+
+    if (empty($routes)) {
+        echo color("\nNo routes registered in Routes/web.php\n\n", 'yellow');
+        return;
+    }
+
+    echo "\n" . color("REGISTERED ROUTES:\n", 'bold');
+    echo str_repeat('-', 95) . "\n";
+    printf("%-8s | %-16s | %-25s | %-35s\n", "METHOD", "NAME", "PATH", "HANDLER");
+    echo str_repeat('-', 95) . "\n";
+
+    foreach ($routes as $route) {
+        $method = $route->getMethod();
+        $name = $route->getName() ?: '-';
+        $path = $route->getPath();
+        $handler = $route->getHandler();
+
+        $handlerDesc = is_string($handler) ? $handler : 'Closure (anonymous function)';
+
+        $methodColor = match ($method) {
+            'GET'    => 'green',
+            'POST'   => 'cyan',
+            'PUT'    => 'yellow',
+            'DELETE' => 'red',
+            default  => 'bold'
+        };
+
+        printf("%-17s | %-16s | %-25s | %-35s\n", color($method, $methodColor), $name, $path, $handlerDesc);
+    }
+
+    echo str_repeat('-', 95) . "\n\n";
+}
+
+/**
+ * Handle clearing mail logs.
+ */
+function handleClearLogs(string $baseDir): void
+{
+    $logFile = $baseDir . '/Others/logs/mail.log';
+    if (file_exists($logFile)) {
+        file_put_contents($logFile, '');
+        echo color("\n[✓] Mail log (Others/logs/mail.log) cleared.\n\n", 'green');
+    } else {
+        echo color("\nNo mail log file found.\n\n", 'yellow');
+    }
+}
+
+/**
+ * Handle serve command.
+ */
+function handleServe(array $args): void
+{
+    $port = 8000;
+    foreach ($args as $arg) {
+        if (str_starts_with($arg, '--port=')) {
+            $port = (int) substr($arg, 7);
+        }
+    }
+
+    echo color("\nStarting Srin Engine local server...\n", 'green');
+    echo "URL: " . color("http://localhost:{$port}\n", 'cyan');
+    echo "Default page: " . color("Pages/welcome.srin.php\n", 'yellow');
+    echo "Press Ctrl+C to stop.\n\n";
+
+    passthru("php -S localhost:{$port} index.php");
+}
+
+/**
+ * Show Help / List of Commands.
+ */
+function showHelp(): void
+{
+    echo "\n";
+    echo color("========================================================\n", 'cyan');
+    echo color("                  Srin Engine CLI Tool                  \n", 'bold');
+    echo color("              Developed by Arindam Makar                \n", 'yellow');
+    echo color("========================================================\n", 'cyan');
+    echo "A simple, lightweight generator for your static site in Core PHP.\n\n";
+
+    echo color("AVAILABLE COMMANDS:\n", 'yellow');
+    echo "  " . color("make:controller <Name>", 'green') . "      Create a new controller in Controller/\n";
+    echo "  " . color("make:controller <Name> --mail", 'green') . " Create a controller with mail transfer methods\n";
+    echo "  " . color("make:page <name>", 'green') . "            Create a new frontend page (name.srin.php)\n";
+    echo "  " . color("make:layout <name>", 'green') . "          Create a master layout (name.srin.php)\n";
+    echo "  " . color("make:error <code>", 'green') . "           Create custom error page (Pages/errors/code.srin.php)\n";
+    echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/web.php\n";
+    echo "  " . color("clear:logs", 'green') . "                  Clear mail development logs\n";
+    echo "  " . color("serve [--port=8000]", 'green') . "         Start PHP's built-in development server\n";
+    echo "  " . color("help", 'green') . "                        Display this help screen\n\n";
+
+    echo color("EXAMPLES:\n", 'yellow');
+    echo "  php srin make:controller HomeController\n";
+    echo "  php srin make:controller ContactController --mail\n";
+    echo "  php srin make:page home\n";
+    echo "  php srin make:error 404\n";
+    echo "  php srin routes\n";
+    echo "  php srin serve\n\n";
+}
+
