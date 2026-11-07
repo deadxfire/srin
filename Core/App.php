@@ -7,6 +7,11 @@ use Throwable;
 class App
 {
     /**
+     * Current framework version.
+     */
+    public const VERSION = '1.0.8';
+
+    /**
      * Load environment variables from .env file into $_ENV, $_SERVER, and putenv().
      */
     public static function loadEnv(?string $path = null): void

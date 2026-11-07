@@ -653,46 +653,87 @@ Link assets directly inside `.srin.php` templates:
 
 ---
 
-## 🎨 Strict Templates & Master Layouts (`@Connect`)
+## 🎨 Strict Templates, Master Layouts & Partials
 
-### 1. Child Page (`Pages/portfolio.srin.php`):
-```php
-@Connect('layouts/main')
-@title('My Portfolio')
+### 1. Master Layout with Named Slots (`Pages/layouts/main.srin.php`):
+Define your layout shell and place named content slots using `@content('slot_name')`, with `@content` for the primary body:
 
-<section class="portfolio">
-    <h1>My Creative Work</h1>
-    <p>Rendered securely through Srin Engine.</p>
-</section>
-```
-
-### 2. Master Layout (`Pages/layouts/main.srin.php`):
 ```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $title ?? config('name') ?></title>
     <link rel="stylesheet" href="{{assets('/css/style.css')}}">
+    @content('head') <!-- Optional page-specific meta or CSS -->
 </head>
 <body>
-    <header>
-        <nav>
-            <a href="{{route('home')}}">Home</a>
-            <a href="{{route('portfolio')}}">Portfolio</a>
-            <a href="{{route('contact')}}">Contact</a>
-        </nav>
-    </header>
+    <!-- 1. Header Slot with fallback navbar partial -->
+    @content('header', view('partials.navbar'))
 
+    <!-- 2. Main Page Content Slot -->
     <main class="container">
         @flash('success')
         @flash('error')
         @content
     </main>
 
+    <!-- 3. Footer Slot -->
+    @content('footer')
+
+    <!-- 4. Scripts Slot -->
     <script src="{{assets('/js/main.js')}}"></script>
+    @content('scripts')
 </body>
 </html>
+```
+
+### 2. Child Webpage with `@contentConnect` (`Pages/portfolio.srin.php`):
+Connect to the layout with `@Connect('layouts/main')`, feed custom sections directly into layout slots using `@contentConnect('slot_name') ... @endContentConnect`, and include partial components directly on the page:
+
+```html
+@Connect('layouts/main')
+@title('My Portfolio')
+
+<!-- Connect Custom Header Section -->
+@contentConnect('header')
+<header class="portfolio-header">
+    @include('partials.navbar') <!-- Dot-notation partial include -->
+    <h1>Featured Creative Portfolio</h1>
+</header>
+@endContentConnect
+
+<!-- Primary Content (Automatically flows into @content) -->
+<section class="portfolio-grid">
+    <h2>Client Showcase</h2>
+    <p>Rendered securely through Srin Engine.</p>
+
+    <!-- Direct Partial Component with Custom Data -->
+    @include('components.card', [
+        'title' => 'E-Commerce Platform',
+        'badge' => 'Production',
+        'image' => assets('/images/portfolio/proj-1.jpg')
+    ])
+</section>
+
+<!-- Connect Custom Footer Section -->
+@contentConnect('footer')
+<footer class="portfolio-footer">
+    <p>&copy; {{ date('Y') }} Custom Portfolio Footer.</p>
+</footer>
+@endContentConnect
+```
+
+### 3. Including Reusable Partials: `@include('path.file')`
+Include reusable template chunks directly onto any webpage using clean dot-notation or slash paths. Inherits all current scope variables and accepts custom parameters:
+
+```html
+<!-- Webpage Partials (Resolves to Pages/partials/navbar.srin.php) -->
+@include('partials.navbar')
+
+<!-- Includes with Custom Data -->
+@include('components.card', ['title' => 'Fast API', 'desc' => 'Lightweight PHP'])
 ```
 
 ---
@@ -781,6 +822,42 @@ composer require vlucas/phpdotenv
 ```
 
 Autoloading is handled automatically in `Others/autoload.php` and loaded in `index.php`.
+
+---
+
+## 🔄 One-Command System Upgrade (`php srin upgrade`)
+
+Keep your Srin Engine up-to-date with a single command. Srin automatically checks the official GitHub repository for updates and safely upgrades the core framework code with overwrite:
+
+```bash
+# Check and upgrade default system code to the latest release:
+php srin upgrade
+
+# Force reinstall & overwrite default framework code with latest repository code:
+php srin upgrade --force
+
+# Check if an update is available without modifying any files:
+php srin upgrade --check
+```
+
+### 🔒 Strict User Data Preservation Guarantee
+`php srin upgrade` safely updates default framework files while **strictly preserving** your project work:
+
+| Component | Upgrade Action | Purpose |
+| :--- | :--- | :--- |
+| `Core/` | **Overwritten** | Engine classes, ORM, router, security layers |
+| `Config/` | **Overwritten** | Default config blueprints (new settings) |
+| `Others/` | **Overwritten** | Vendor autoloader & Composer libraries |
+| `srin`, `srin.php` | **Overwritten** | CLI binary & helper commands |
+| `index.php`, `.htaccess` | **Overwritten** | Application gateway & Apache rewrites |
+| `Pages/welcome.srin.php` | **Overwritten** | Documentation showcase & release notes |
+| **`.env`** | **PRESERVED** | Your secrets, database keys & credentials |
+| **`Model/`** | **PRESERVED** | Your custom database models |
+| **`Controller/`** | **PRESERVED** | Your custom application controllers |
+| **`database/`** | **PRESERVED** | Your migrations & SQLite database files |
+| **`assets/`** | **PRESERVED** | Your stylesheets, scripts, images & fonts |
+| **`Pages/`** (custom) | **PRESERVED** | Your custom templates, layouts & partials |
+| **`.git/`** | **PRESERVED** | Your Git version history & branches |
 
 ---
 

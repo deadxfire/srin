@@ -52,6 +52,7 @@
         "srin": "php srin",
         "serve": "php srin serve",
         "routes": "php srin routes",
+        "upgrade": "php srin upgrade",
         "post-create-project-cmd": [
             "@php -r \"echo PHP_EOL . '========================================================' . PHP_EOL . '              Srin Engine Installed!                    ' . PHP_EOL . '            Developed by Arindam Makar                  ' . PHP_EOL . '        GitHub: https://github.com/deadxfire            ' . PHP_EOL . '========================================================' . PHP_EOL . 'To start your local server, run:' . PHP_EOL . '  php srin serve' . PHP_EOL . PHP_EOL;\""
         ]

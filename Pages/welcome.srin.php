@@ -297,6 +297,30 @@ php srin migrate:fresh     # Drop all tables and re-run all migrations</code></p
 
                         <h3>Start the Local Server</h3>
                         <pre><code>php srin serve --port=8000</code></pre>
+
+                        <h3>One-Command System Upgrade (<code>php srin upgrade</code>)</h3>
+                        <p>Automatically checks for official updates from GitHub (<code>deadxfire/srin</code>) and upgrades the default core framework files with overwrite, while strictly preserving your project code:</p>
+                        <pre><code># Check and upgrade default system code to the latest release:
+php srin upgrade
+
+# Force overwrite default system files with latest repository code:
+php srin upgrade --force
+
+# Check if an update is available without modifying any files:
+php srin upgrade --check</code></pre>
+
+                        <div class="highlight-box">
+                            🔒 <strong>Strict User Data Preservation Guarantee:</strong>
+                            <code>php srin upgrade</code> safely overwrites default framework components (<code>Core/</code>, <code>Config/</code>, <code>Others/</code>, <code>srin</code>, <code>srin.php</code>, <code>index.php</code>, <code>Pages/welcome.srin.php</code>, <code>README.md</code>), while <strong>never</strong> touching your custom project data:
+                            <ul style="margin: 8px 0 0 20px;">
+                                <li><code>.env</code> (Secrets, database credentials &amp; API keys)</li>
+                                <li><code>Model/</code> (All custom database models)</li>
+                                <li><code>Controller/</code> (All custom application controllers)</li>
+                                <li><code>database/</code> (Migrations &amp; SQLite database files)</li>
+                                <li><code>assets/</code> (Custom CSS, JavaScript, images &amp; fonts)</li>
+                                <li><code>Pages/</code> (Custom templates, layouts &amp; partials)</li>
+                            </ul>
+                        </div>
                     </section>
 
                     <!-- 5. Database Models & Migrations -->
@@ -820,23 +844,82 @@ class ArticleController extends BaseController
     &lt;p&gt;No projects found.&lt;/p&gt;
 @@endif</code></pre>
 
-                        <h3>Master Layout (e.g. <code>Pages/layouts/main.srin.php</code>):</h3>
+                        <h3>Master Layout with Named Slots: <code>@@content('name')</code></h3>
+                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>@@content('slot_name')</code> alongside the primary <code>@@content</code>:</p>
                         <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
     &lt;title&gt;@{{ \$title ?? config('name') }}&lt;/title&gt;
     &lt;link rel="icon" type="image/svg+xml" href="@{{assets('/favicon.svg')}}"&gt;
     &lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
+    @@content('styles') &lt;!-- Optional page styles --&gt;
 &lt;/head&gt;
 &lt;body&gt;
+    &lt;!-- Header Slot --&gt;
+    @@content('header')
+
     &lt;main class="container"&gt;
         @@flash('success')
         @@flash('error')
+        
+        &lt;!-- Default Main Page Content --&gt;
         @@content
     &lt;/main&gt;
+
+    &lt;!-- Sidebar with optional fallback HTML --&gt;
+    @@content('sidebar', '&lt;aside&gt;Default Sidebar Content&lt;/aside&gt;')
+
+    &lt;!-- Footer Slot --&gt;
+    @@content('footer')
+
     &lt;script src="@{{assets('/js/main.js')}}"&gt;&lt;/script&gt;
+    @@content('scripts') &lt;!-- Optional page scripts --&gt;
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
+
+                        <h3>Connecting Content on Pages: <code>@@contentConnect('name')</code> &amp; <code>@@Connect</code></h3>
+                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>@@Connect('layouts/main')</code>, and slot custom sections into your layout using <code>@@contentConnect('name') ... @@endContentConnect</code> (or <code>@@contentCconnect</code>):</p>
+                        
+                        <pre><code>@@Connect('layouts/main')
+@@title('Home Page')
+
+&lt;!-- 1. Connect Custom Header --&gt;
+@@contentConnect('header')
+&lt;header class="hero-header"&gt;
+    @@include('partials.navbar') &lt;!-- Includes Pages/partials/navbar.srin.php --&gt;
+    &lt;h1&gt;Welcome to @{{ config('name') }}&lt;/h1&gt;
+&lt;/header&gt;
+@@endContentConnect
+
+&lt;!-- 2. Default Main Page Content (Automatically slots into @content) --&gt;
+&lt;section class="services"&gt;
+    &lt;h2&gt;Our Services&lt;/h2&gt;
+    &lt;p&gt;This primary content flows directly into the main @content area.&lt;/p&gt;
+
+    &lt;!-- Reusable partial card with custom data --&gt;
+    @@include('components.card', ['title' =&gt; 'Fast Development', 'desc' =&gt; 'Core PHP engine with zero bloat'])
+&lt;/section&gt;
+
+&lt;!-- 3. Connect Custom Footer --&gt;
+@@contentConnect('footer')
+&lt;footer class="custom-footer"&gt;
+    &lt;p&gt;&amp;copy; @{{ date('Y') }} Custom Footer for Home Page.&lt;/p&gt;
+&lt;/footer&gt;
+@@endContentConnect</code></pre>
+
+                        <h3>Including Partials: <code>@@include('path.file')</code></h3>
+                        <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>@@include('partials.navbar')</code> or <code>@@include('components.card')</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
+
+                        <pre><code>&lt;!-- Direct partial include with inherited page variables --&gt;
+@@include('partials.navbar')      &lt;!-- Resolves to Pages/partials/navbar.srin.php --&gt;
+@@include('includes.sidebar')     &lt;!-- Resolves to Pages/includes/sidebar.srin.php --&gt;
+
+&lt;!-- Passing custom variables into the partial --&gt;
+@@include('components.product-card', [
+    'title' =&gt; 'Srin Engine Pro',
+    'price' =&gt; 99.00,
+    'badge' =&gt; 'Popular'
+])</code></pre>
                     </section>
 
                     <!-- 8. Defining Routes -->
