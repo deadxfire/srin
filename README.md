@@ -284,13 +284,13 @@ Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
 <span>@{{ vueData }}</span> <!-- Compiles literally to {{ vueData }} -->
 ```
 
-### Control Flow: Clean Srin Tags (Zero Laravel Copycat):
+### Control Flow: Clean Srin Tags & Descriptive Closers (Zero Laravel Copycat):
 ```html
 [if $user]
     <h2>Welcome back, {{ $user->name }}!</h2>
 [else]
     <a href="{{ route('auth.login') }}">Sign In</a>
-[end]
+[ifend]
 
 [each $posts as $post]
     <article>
@@ -299,7 +299,7 @@ Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
     </article>
 [empty]
     <p>No articles published yet.</p>
-[end]
+[eachend]
 ```
 
 ---
@@ -871,21 +871,22 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 | | `[title 'Page Title']` | `[title 'My Profile']` | Set the HTML page title variable `$title` |
 | | `[slot 'name', 'fallback']` | `[slot 'header']` | Declare named injection slot in master layout |
 | | `[slot]` | `[slot]` | Main page body placeholder in master layout |
-| | `[block 'name'] ... [end]` | `[block 'scripts'] ... [end]` | Inject custom section or assets into layout slot |
+| | `[block 'name'] ... [blockend]` | `[block 'scripts'] ... [blockend]` (or `[/block]`) | Inject custom section or assets into layout slot |
 | **Partials** | `[include 'path.file']` | `[include 'partials/navbar']` | Include reusable partial template (dot or slash path) |
 | | `[include 'path', $data]` | `[include 'components/card', ['title' => 'Pro']]` | Include partial with custom scoped data |
-| **Control Flow** | `[if condition] ... [end]` | `[if $user] ... [end]` | Conditional branching |
+| **Control Flow** | `[if condition] ... [ifend]` | `[if $user] ... [else] ... [ifend]` (or `[/if]`) | Conditional branching with dedicated `[ifend]` |
 | | `[elseif condition]` | `[elseif $guest]` | Else-if condition branch |
 | | `[else]` | `[else]` | Fallback branch |
-| | `[unless condition]` | `[unless $isSubscribed] ... [end]` | Inverted condition (`if (!condition)`) |
-| | `[isset $var]` | `[isset $account->bio] ... [end]` | Variable existence check |
-| | `[empty $var]` | `[empty $posts] ... [end]` | Variable emptiness check |
-| | `[each $items as $item]` | `[each $posts as $p] ... [end]` | Iterate over arrays, models, or collections |
-| | `[empty]` | `[each $p as $i] ... [empty] ... [end]` | Fallback when collection is empty (no forelse needed!) |
-| | `[for ...]` | `[for $i = 1; $i <= 5; $i++] ... [end]` | Standard numeric loop |
-| | `[while condition]` | `[while $hasMore] ... [end]` | Standard while loop |
+| | `[unless condition] ... [endless]` | `[unless $isSubscribed] ... [endless]` (or `[unlessend]`) | Inverted condition (`if (!condition)`) |
+| | `[isset $var] ... [issetend]` | `[isset $account->bio] ... [issetend]` (or `[/isset]`) | Variable existence check |
+| | `[empty $var] ... [ifend]` | `[empty $posts] ... [ifend]` | Variable emptiness check |
+| | `[each $items as $item] ... [eachend]` | `[each $posts as $p] ... [eachend]` (or `[/each]`) | Iterate over arrays, models, or collections |
+| | `[empty]` | `[each $p as $i] ... [empty] ... [eachend]` | Fallback when collection is empty (no forelse needed!) |
+| | `[for ...] ... [forend]` | `[for $i = 1; $i <= 5; $i++] ... [forend]` (or `[/for]`) | Standard numeric loop |
+| | `[while condition] ... [whileend]` | `[while $hasMore] ... [whileend]` (or `[/while]`) | Standard while loop |
+| | `[end]` | `[if $x] ... [end]`, `[each $p] ... [end]` | Universal fallback closer supported on any block type |
 | **UI Controls** | `[paginate $paginator]` | `[paginate $articles]` | Render responsive HTML pagination with pill links |
-| | `@flash('key')` | `@flash('success')` | Render session flash alert banner if set |
+| | `[flash 'key']` | `[flash 'success']` | Render session flash alert banner if set |
 | **Security** | `[csrf]` | `<form>[csrf]</form>` | Inject hidden CSRF protection token input |
 | | `[honeypot]` | `<form>[honeypot]</form>` | Inject invisible spam-bot trap field |
 | | `{{ $expression }}` | `<h1>{{ $article->title }}</h1>` | Auto-escaped XSS-safe variable printing |

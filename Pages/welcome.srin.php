@@ -574,7 +574,7 @@ public function index(): string
         &lt;h2&gt;@{{ \$article-&gt;title }}&lt;/h2&gt;
         &lt;p&gt;@{{ \$article-&gt;summary }}&lt;/p&gt;
     &lt;/article&gt;
-[end]
+[eachend]
 
 &lt;!-- Render responsive pagination controls (prev, numbered pills, next): --&gt;
 [paginate \$articles]
@@ -1086,91 +1086,91 @@ class ArticleController extends BaseController
     &lt;button type="submit"&gt;Send Message&lt;/button&gt;
 &lt;/form&gt;</code></pre>
 
-                        <h3>Control Flow Directives (Clean Srin Tags):</h3>
+                        <h3>Control Flow Directives (Clean Srin Tags &amp; Descriptive Closers):</h3>
                         <pre><code>[if count(\$projects) &gt; 0]
     [each \$projects as \$project]
         &lt;div class="card"&gt;@{{ \$project['title'] }}&lt;/div&gt;
-    [end]
+    [eachend]
 [else]
     &lt;p&gt;No projects found.&lt;/p&gt;
-[end]</code></pre>
+[ifend]</code></pre>
 
-                        <h3>Master Layout with Named Slots: <code>@@content('name')</code></h3>
-                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>@@content('slot_name')</code> alongside the primary <code>@@content</code>:</p>
+                        <h3>Master Layout with Named Slots: <code>[slot 'name']</code></h3>
+                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>[slot 'slot_name']</code> alongside the primary <code>[slot 'content']</code>:</p>
                         <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
     &lt;title&gt;@{{ \$title ?? config('name') }}&lt;/title&gt;
     &lt;link rel="icon" type="image/svg+xml" href="@{{assets('/favicon.svg')}}"&gt;
     &lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
-    @@content('styles') &lt;!-- Optional page styles --&gt;
+    [slot 'styles'] &lt;!-- Optional page styles --&gt;
 &lt;/head&gt;
 &lt;body&gt;
     &lt;!-- Header Slot --&gt;
-    @@content('header')
+    [slot 'header']
 
     &lt;main class="container"&gt;
-        @@flash('success')
-        @@flash('error')
+        [flash 'success']
+        [flash 'error']
         
         &lt;!-- Default Main Page Content --&gt;
-        @@content
+        [slot 'content']
     &lt;/main&gt;
 
     &lt;!-- Sidebar with optional fallback HTML --&gt;
-    @@content('sidebar', '&lt;aside&gt;Default Sidebar Content&lt;/aside&gt;')
+    [slot 'sidebar', '&lt;aside&gt;Default Sidebar Content&lt;/aside&gt;']
 
     &lt;!-- Footer Slot --&gt;
-    @@content('footer')
+    [slot 'footer']
 
     &lt;script src="@{{assets('/js/main.js')}}"&gt;&lt;/script&gt;
-    @@content('scripts') &lt;!-- Optional page scripts --&gt;
+    [slot 'scripts'] &lt;!-- Optional page scripts --&gt;
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
 
-                        <h3>Connecting Content on Pages: <code>@@contentConnect('name')</code> &amp; <code>@@Connect</code></h3>
-                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>@@Connect('layouts/main')</code>, and slot custom sections into your layout using <code>@@contentConnect('name') ... @@endContentConnect</code> (or <code>@@contentCconnect</code>):</p>
+                        <h3>Connecting Content on Pages: <code>[layout 'name']</code> &amp; <code>[block 'name']...[blockend]</code></h3>
+                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>[layout 'layouts/main']</code>, and inject custom sections into your layout using <code>[block 'name'] ... [blockend]</code> (or <code>[/block]</code>):</p>
                         
-                        <pre><code>@@Connect('layouts/main')
-@@title('Home Page')
+                        <pre><code>[layout 'layouts/main']
+[title 'Home Page']
 
 &lt;!-- 1. Connect Custom Header --&gt;
-@@contentConnect('header')
+[block 'header']
 &lt;header class="hero-header"&gt;
-    @@include('partials.navbar') &lt;!-- Includes Pages/partials/navbar.srin.php --&gt;
+    [include 'partials.navbar'] &lt;!-- Includes Pages/partials/navbar.srin.php --&gt;
     &lt;h1&gt;Welcome to @{{ config('name') }}&lt;/h1&gt;
 &lt;/header&gt;
-@@endContentConnect
+[blockend]
 
-&lt;!-- 2. Default Main Page Content (Automatically slots into @content) --&gt;
+&lt;!-- 2. Default Main Page Content (Automatically slots into [slot 'content']) --&gt;
 &lt;section class="services"&gt;
     &lt;h2&gt;Our Services&lt;/h2&gt;
-    &lt;p&gt;This primary content flows directly into the main @content area.&lt;/p&gt;
+    &lt;p&gt;This primary content flows directly into the main content slot.&lt;/p&gt;
 
     &lt;!-- Reusable partial card with custom data --&gt;
-    @@include('components.card', ['title' =&gt; 'Fast Development', 'desc' =&gt; 'Core PHP engine with zero bloat'])
+    [include 'components.card', ['title' =&gt; 'Fast Development', 'desc' =&gt; 'Core PHP engine with zero bloat']]
 &lt;/section&gt;
 
 &lt;!-- 3. Connect Custom Footer --&gt;
-@@contentConnect('footer')
+[block 'footer']
 &lt;footer class="custom-footer"&gt;
     &lt;p&gt;&amp;copy; @{{ date('Y') }} Custom Footer for Home Page.&lt;/p&gt;
 &lt;/footer&gt;
-@@endContentConnect</code></pre>
+[blockend]</code></pre>
 
-                        <h3>Including Partials: <code>@@include('path.file')</code></h3>
-                        <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>@@include('partials.navbar')</code> or <code>@@include('components.card')</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
+                        <h3>Including Partials: <code>[include 'path.file']</code></h3>
+                        <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>[include 'partials.navbar']</code> or <code>[include 'components.card']</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
 
                         <pre><code>&lt;!-- Direct partial include with inherited page variables --&gt;
-@@include('partials.navbar')      &lt;!-- Resolves to Pages/partials/navbar.srin.php --&gt;
-@@include('includes.sidebar')     &lt;!-- Resolves to Pages/includes/sidebar.srin.php --&gt;
+[include 'partials.navbar']      &lt;!-- Resolves to Pages/partials/navbar.srin.php --&gt;
+[include 'includes.sidebar']     &lt;!-- Resolves to Pages/includes/sidebar.srin.php --&gt;
 
 &lt;!-- Passing custom variables into the partial --&gt;
-@@include('components.product-card', [
+[include 'components.product-card', [
     'title' =&gt; 'Srin Engine Pro',
     'price' =&gt; 99.00,
     'badge' =&gt; 'Popular'
-])</code></pre>
+]]</code></pre>
 
                         <h3>Master Shortcode &amp; Template Directive Reference:</h3>
                         <p>Below is the complete cheat sheet of all template shortcodes and directives supported by Srin Engine:</p>
@@ -1189,52 +1189,42 @@ class ArticleController extends BaseController
                                         <td colspan="3">1. Layouts, Slots &amp; Titles</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@Connect('layouts/name')</code></td>
-                                        <td><code>@@Connect('layouts/main')</code></td>
+                                        <td><code>[layout 'layouts/name']</code></td>
+                                        <td><code>[layout 'layouts/main']</code></td>
                                         <td>Connects a child webpage to a master layout template in <code>Pages/layouts/</code>.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@title('Page Title')</code></td>
-                                        <td><code>@@title('Dashboard - Analytics')</code></td>
+                                        <td><code>[title 'Page Title']</code></td>
+                                        <td><code>[title 'Dashboard - Analytics']</code></td>
                                         <td>Sets the page title variable <code>\$title</code> for the layout.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@content('name', 'fallback')</code></td>
-                                        <td><code>@@content('header', view('partials.nav'))</code></td>
+                                        <td><code>[slot 'name', 'fallback']</code></td>
+                                        <td><code>[slot 'header', '&lt;div&gt;Default&lt;/div&gt;']</code></td>
                                         <td>Defines a named slot in master layout with optional fallback content.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@content</code></td>
-                                        <td><code>@@content</code></td>
+                                        <td><code>[slot 'content']</code></td>
+                                        <td><code>[slot 'content']</code></td>
                                         <td>Injects primary child page content into the layout.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@contentConnect('name')</code></td>
-                                        <td><code>@@contentConnect('header') ... @@endContentConnect</code></td>
+                                        <td><code>[block 'name'] ... [blockend]</code></td>
+                                        <td><code>[block 'header'] ... [blockend]</code> (or <code>[/block]</code>)</td>
                                         <td>Defines custom content block on webpage to inject into matching layout slot.</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>@@connectContent('name')</code></td>
-                                        <td><code>@@connectContent('main') ... @@endconnectContent</code></td>
-                                        <td>Alias for <code>@@contentConnect</code> (word-order flexible).</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>@@contentCconnect('name')</code></td>
-                                        <td><code>@@contentCconnect('footer') ... @@endContentCconnect</code></td>
-                                        <td>Alias for <code>@@contentConnect</code> (supports double-C spelling).</td>
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
                                         <td colspan="3">2. Partials &amp; Components</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@include('path.file')</code></td>
-                                        <td><code>@@include('partials.navbar')</code></td>
+                                        <td><code>[include 'path.file']</code></td>
+                                        <td><code>[include 'partials.navbar']</code></td>
                                         <td>Directly includes a reusable partial view. Supports dot-notation and slash paths.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@include('name', \$data)</code></td>
-                                        <td><code>@@include('components.card', ['title' =&gt; 'Pro'])</code></td>
+                                        <td><code>[include 'name', \$data]</code></td>
+                                        <td><code>[include 'components.card', ['title' =&gt; 'Pro']]</code></td>
                                         <td>Includes a partial while passing custom scoped variables.</td>
                                     </tr>
 
@@ -1242,13 +1232,13 @@ class ArticleController extends BaseController
                                         <td colspan="3">3. Database &amp; UI Controls</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@paginate(\$paginator)</code></td>
-                                        <td><code>@@paginate(\$articles)</code></td>
+                                        <td><code>[paginate \$paginator]</code></td>
+                                        <td><code>[paginate \$articles]</code></td>
                                         <td>Renders modern, responsive HTML pagination controls with numbered pills &amp; prev/next links.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@flash('key')</code></td>
-                                        <td><code>@@flash('success')</code>, <code>@@flash('error')</code></td>
+                                        <td><code>[flash 'key']</code></td>
+                                        <td><code>[flash 'success']</code>, <code>[flash 'error']</code></td>
                                         <td>Automatically renders session flash message alerts if present.</td>
                                     </tr>
 
@@ -1256,13 +1246,13 @@ class ArticleController extends BaseController
                                         <td colspan="3">4. Security &amp; Anti-Hacking Directives</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@csrf</code></td>
-                                        <td><code>@@csrf</code></td>
+                                        <td><code>[csrf]</code></td>
+                                        <td><code>[csrf]</code></td>
                                         <td>Renders hidden cryptographic CSRF protection input field inside forms.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>@@honeypot</code></td>
-                                        <td><code>@@honeypot</code></td>
+                                        <td><code>[honeypot]</code></td>
+                                        <td><code>[honeypot]</code></td>
                                         <td>Renders invisible anti-bot honeypot input field to trap automated spam bots.</td>
                                     </tr>
                                     <tr>
@@ -1287,47 +1277,47 @@ class ArticleController extends BaseController
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
-                                        <td colspan="3">5. Template Control Flow Directives (Srin Tags)</td>
+                                        <td colspan="3">5. Template Control Flow Directives (Srin Tags &amp; Descriptive Closers)</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[if condition] ... [end]</code></td>
-                                        <td><code>[if \$count &gt; 0] ... [else] ... [end]</code></td>
-                                        <td>Standard conditional branching with universal <code>[end]</code> closure.</td>
+                                        <td><code>[if condition] ... [ifend]</code></td>
+                                        <td><code>[if \$count &gt; 0] ... [else] ... [ifend]</code> (or <code>[/if]</code>)</td>
+                                        <td>Standard conditional branching with descriptive <code>[ifend]</code> or HTML-style <code>[/if]</code>.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[unless condition]</code></td>
-                                        <td><code>[unless \$loggedIn] ... [end]</code></td>
+                                        <td><code>[unless condition] ... [unlessend]</code></td>
+                                        <td><code>[unless \$loggedIn] ... [endless]</code> (or <code>[unlessend]</code>, <code>[/unless]</code>)</td>
                                         <td>Inverted condition (executes when condition is false).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[isset \$variable]</code></td>
-                                        <td><code>[isset \$user-&gt;bio] ... [end]</code></td>
+                                        <td><code>[isset \$variable] ... [issetend]</code></td>
+                                        <td><code>[isset \$user-&gt;bio] ... [issetend]</code> (or <code>[/isset]</code>)</td>
                                         <td>Checks if a variable is set and not null.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[empty \$variable]</code></td>
-                                        <td><code>[empty \$posts] ... [end]</code></td>
-                                        <td>Checks if a collection or variable is empty.</td>
+                                        <td><code>[each \$items as \$item] ... [eachend]</code></td>
+                                        <td><code>[each \$posts as \$post] ... [eachend]</code> (or <code>[/each]</code>)</td>
+                                        <td>Iterates over arrays, collections, or paginators with dedicated <code>[eachend]</code> closer.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[each \$items as \$item]</code></td>
-                                        <td><code>[each \$posts as \$post] ... [end]</code></td>
-                                        <td>Iterates over arrays, collections, or paginators.</td>
-                                    </tr>
-                                    <tr>
-                                        <td><code>[each] ... [empty] ... [end]</code></td>
-                                        <td><code>[each \$posts as \$p] ... [empty] ... [end]</code></td>
+                                        <td><code>[each] ... [empty] ... [eachend]</code></td>
+                                        <td><code>[each \$posts as \$p] ... [empty] ... [eachend]</code></td>
                                         <td>Iterate with automatic fallback when collection is empty (no forelse needed!).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[for ...]</code></td>
-                                        <td><code>[for \$i = 1; \$i &lt;= 5; \$i++] ... [end]</code></td>
+                                        <td><code>[for ...] ... [forend]</code></td>
+                                        <td><code>[for \$i = 1; \$i &lt;= 5; \$i++] ... [forend]</code> (or <code>[/for]</code>)</td>
                                         <td>Standard numeric for loop.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[while condition]</code></td>
-                                        <td><code>[while \$hasMore] ... [end]</code></td>
+                                        <td><code>[while condition] ... [whileend]</code></td>
+                                        <td><code>[while \$hasMore] ... [whileend]</code> (or <code>[/while]</code>)</td>
                                         <td>Standard while loop.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>[end]</code></td>
+                                        <td><code>[if \$x] ... [end]</code>, <code>[each \$p] ... [end]</code></td>
+                                        <td>Universal fallback closer supporting all block types.</td>
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">

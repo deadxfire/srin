@@ -61,9 +61,9 @@ class View
             $rawContent = preg_replace('/^\s*\[title\s*[\'"]([^\'"]+)[\'"]\s*\]\r?\n?/mi', '', $rawContent, 1);
         }
 
-        // 3. Extract named content sections: [block 'name']...[end]
+        // 3. Extract named content sections: [block 'name']...[blockend] or [/block] or [end]
         $sections = [];
-        $sectionPattern = '/\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)\[(?:end|\/(?:block|section))\]/si';
+        $sectionPattern = '/\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section)|end)\]/si';
 
         $rawContent = preg_replace_callback($sectionPattern, function ($m) use (&$sections, $data) {
             $name = trim($m[1] ?? '');
@@ -242,16 +242,38 @@ class View
             $template
         );
 
-        // 6. Control Flow Engine with Universal [end] Stack (Balanced PCRE Brackets)
+        // 6. Control Flow Engine with Universal & Named Closers Stack (Balanced PCRE Brackets)
         $controlPattern = '/('
             . '\[(if|elseif|each|for|while|unless|isset)\s+((?:[^\[\]]++|\[(?3)\])*)\]'
-            . '|\[(else|empty|end|endif|\/if|endeach|\/each|endfor|\/for|endwhile|\/while|endunless|\/unless|endisset|\/isset|endempty|\/empty)\]'
+            . '|\[(else|empty|end|ifend|\/if|endif|eachend|\/each|endeach|unlessend|endless|\/unless|endunless|issetend|\/isset|endisset|forend|\/for|endfor|whileend|\/while|endwhile|blockend|\/block|endblock|sectionend|\/section|endsection)\]'
             . ')/i';
 
         $stack = [];
         $eachCounter = 0;
 
-        $template = preg_replace_callback($controlPattern, function ($m) use (&$stack, &$eachCounter) {
+        $tagMap = [
+            'ifend'     => 'if',
+            '/if'       => 'if',
+            'endif'     => 'if',
+            'eachend'   => 'each',
+            '/each'     => 'each',
+            'endeach'   => 'each',
+            'unlessend' => 'unless',
+            'endless'   => 'unless',
+            '/unless'   => 'unless',
+            'endunless' => 'unless',
+            'issetend'  => 'isset',
+            '/isset'    => 'isset',
+            'endisset'  => 'isset',
+            'forend'    => 'for',
+            '/for'      => 'for',
+            'endfor'    => 'for',
+            'whileend'  => 'while',
+            '/while'    => 'while',
+            'endwhile'  => 'while',
+        ];
+
+        $template = preg_replace_callback($controlPattern, function ($m) use (&$stack, &$eachCounter, $tagMap) {
             $full = $m[1] ?? '';
 
             // 1. [tag expr]
@@ -304,7 +326,38 @@ class View
                     }
                     return "<?php else: ?>";
                 }
-                // Closings: end, endif, /if, endeach, /each, etc.
+
+                // Block closings that appear standalone in compiled content
+                if (in_array($tag, ['blockend', '/block', 'endblock', 'sectionend', '/section', 'endsection'], true)) {
+                    return '';
+                }
+
+                // Specific named closer: [ifend], [eachend], [endless], [/if], [/each], etc.
+                if (isset($tagMap[$tag])) {
+                    $expected = $tagMap[$tag];
+                    $closingCode = '';
+                    while (!empty($stack)) {
+                        $top = array_pop($stack);
+                        if ($top['type'] === 'each') {
+                            $closingCode .= !empty($top['has_empty']) ? "<?php endif; ?>" : "<?php endforeach; ?>";
+                        } elseif ($top['type'] === 'for') {
+                            $closingCode .= "<?php endfor; ?>";
+                        } elseif ($top['type'] === 'while') {
+                            $closingCode .= "<?php endwhile; ?>";
+                        } else {
+                            $closingCode .= "<?php endif; ?>";
+                        }
+                        if ($top['type'] === $expected) {
+                            return $closingCode;
+                        }
+                    }
+                    if ($expected === 'each') return "<?php endforeach; ?>";
+                    if ($expected === 'for') return "<?php endfor; ?>";
+                    if ($expected === 'while') return "<?php endwhile; ?>";
+                    return "<?php endif; ?>";
+                }
+
+                // Universal fallback closer: [end]
                 if (!empty($stack)) {
                     $closed = array_pop($stack);
                     if ($closed['type'] === 'each') {
