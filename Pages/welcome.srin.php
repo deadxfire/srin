@@ -1136,6 +1136,21 @@ class ArticleController extends BaseController
                                         <td>Retrieves previous form input after a validation error.</td>
                                     </tr>
                                     <tr>
+                                        <td><code>is_home()</code></td>
+                                        <td><code>@@unless(is_home()) ... @@endunless</code></td>
+                                        <td>Returns <code>true</code> on homepage (<code>/</code> or named route <code>'home'</code>), <code>false</code> otherwise.</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>is_route('name')</code></td>
+                                        <td><code>@@if(is_route('contact')) ... @@endif</code></td>
+                                        <td>Checks if current route name or URI matches. Supports wildcards (<code>'blog.*'</code>).</td>
+                                    </tr>
+                                    <tr>
+                                        <td><code>request_uri()</code></td>
+                                        <td><code>@@if(request_uri() !== '/') ... @@endif</code></td>
+                                        <td>Returns the current relative request path (without query parameters).</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>csrf_field()</code></td>
                                         <td><code>@{{csrf_field()}}</code></td>
                                         <td>HTML hidden input containing CSRF security token.</td>

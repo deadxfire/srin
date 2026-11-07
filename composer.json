@@ -32,7 +32,8 @@
             "Controller\\": "Controller/",
             "Core\\": "Core/",
             "Config\\": "Config/",
-            "Model\\": "Model/"
+            "Model\\": "Model/",
+            "Database\\Seeders\\": "database/seeders/"
         },
         "files": [
             "Core/Helper.php"

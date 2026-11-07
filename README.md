@@ -798,6 +798,9 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 | | `{{url('/path')}}` | `<a href="{{url('/contact')}}">Contact</a>` | Application URL with subfolder auto-detection |
 | | `{{config('key', 'default')}}` | `<title>{{ config('name') }}</title>` | Read application configuration |
 | | `{{old('field')}}` | `<input value="{{ old('email') }}">` | Repopulate input after validation error |
+| | `is_home()` | `@unless(is_home()) ... @endunless` | Check if current page is the homepage |
+| | `is_route('name')` | `@if(is_route('contact')) ... @endif` | Check current route name (supports wildcards) |
+| | `request_uri()` | `@if(request_uri() !== '/') ... @endif` | Get clean relative request path |
 
 ---
 

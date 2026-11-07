@@ -351,5 +351,63 @@ if (!function_exists('download')) {
     }
 }
 
+if (!function_exists('is_home')) {
+    /**
+     * Check if the current page is the homepage ('/' or route named 'home' / 'index').
+     *
+     * Example:
+     *   @unless(is_home())
+     *       <div class="subpage-banner">...</div>
+     *   @endunless
+     */
+    function is_home(): bool
+    {
+        $uri = \Core\Request::uri();
+        if ($uri === '/' || $uri === '' || $uri === '/index.php') {
+            return true;
+        }
+
+        $routeName = \Core\Router::currentRouteName();
+        return $routeName === 'home' || $routeName === 'index';
+    }
+}
+
+if (!function_exists('is_route')) {
+    /**
+     * Check if the current route matches a given name or URI pattern.
+     * Supports wildcards e.g. is_route('blog.*') or is_route('contact').
+     *
+     * Example:
+     *   @if(!is_route('home'))
+     *       <div class="breadcrumb">...</div>
+     *   @endif
+     */
+    function is_route(string|array $patterns): bool
+    {
+        return \Core\Router::is($patterns);
+    }
+}
+
+if (!function_exists('request_uri')) {
+    /**
+     * Get the current request URI without query string.
+     */
+    function request_uri(): string
+    {
+        return \Core\Request::uri();
+    }
+}
+
+if (!function_exists('request_path')) {
+    /**
+     * Get the current request path (alias of request_uri).
+     */
+    function request_path(): string
+    {
+        return \Core\Request::uri();
+    }
+}
+
+
 
 

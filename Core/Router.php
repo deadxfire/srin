@@ -20,6 +20,69 @@ class Router
     protected static array $namedRoutes = [];
 
     /**
+     * Currently matched and active route.
+     */
+    protected static ?Route $currentRoute = null;
+
+    /**
+     * Get the currently active Route.
+     */
+    public static function current(): ?Route
+    {
+        return self::$currentRoute;
+    }
+
+    /**
+     * Get the name of the currently active route.
+     */
+    public static function currentRouteName(): ?string
+    {
+        return self::$currentRoute?->getName();
+    }
+
+    /**
+     * Check if the current route matches a specific name or pattern.
+     * Supports exact names ('home') and wildcards ('blog.*').
+     */
+    public static function is(string|array $patterns): bool
+    {
+        $currentName = self::currentRouteName();
+        $uri = Request::uri();
+
+        $patterns = is_array($patterns) ? $patterns : func_get_args();
+
+        foreach ($patterns as $pattern) {
+            if ($currentName !== null) {
+                if ($currentName === $pattern) {
+                    return true;
+                }
+                if (str_contains($pattern, '*')) {
+                    $regex = '#^' . str_replace('\*', '.*', preg_quote($pattern, '#')) . '$#i';
+                    if (preg_match($regex, $currentName)) {
+                        return true;
+                    }
+                }
+            }
+
+            $patternPath = trim($pattern, '/');
+            $currentPath = trim($uri, '/');
+
+            if ($patternPath === $currentPath) {
+                return true;
+            }
+
+            if (str_contains($pattern, '*')) {
+                $regex = '#^' . str_replace('\*', '.*', preg_quote($patternPath, '#')) . '$#i';
+                if (preg_match($regex, $currentPath)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Get all registered routes.
      */
     public static function getRoutes(): array
@@ -145,6 +208,7 @@ class Router
 
             if (preg_match($pattern, $uri, $matches)) {
                 array_shift($matches); // Remove full match
+                self::$currentRoute = $route;
 
                 $result = self::executeHandler($route->getHandler(), $matches);
 

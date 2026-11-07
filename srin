@@ -61,7 +61,16 @@ switch ($command) {
         break;
 
     case 'migrate:fresh':
-        handleMigrateFresh($baseDir);
+        handleMigrateFresh($arguments, $baseDir);
+        break;
+
+    case 'make:seeder':
+        handleMakeSeeder($arguments, $baseDir);
+        break;
+
+    case 'db:seed':
+    case 'seed':
+        handleDbSeed($arguments, $baseDir);
         break;
 
     case 'make:page':
@@ -1003,7 +1012,7 @@ function handleMigrateStatus(string $baseDir): void
 /**
  * Handle migrate:fresh command.
  */
-function handleMigrateFresh(string $baseDir): void
+function handleMigrateFresh(array $args, string $baseDir): void
 {
     bootstrapApp($baseDir);
 
@@ -1017,9 +1026,144 @@ function handleMigrateFresh(string $baseDir): void
             }
         });
 
-        echo color("\n[✓] Fresh database migration completed! (" . count($applied) . " applied)\n\n", 'green');
+        echo color("\n[✓] Fresh database migration completed! (" . count($applied) . " applied)\n", 'green');
+
+        if (in_array('--seed', $args, true)) {
+            handleDbSeed($args, $baseDir);
+        } else {
+            echo "\n";
+        }
     } catch (\Throwable $e) {
         echo color("\n[X] Fresh Error: " . $e->getMessage() . "\n\n", 'red');
+    }
+}
+
+/**
+ * Handle make:seeder command.
+ */
+function handleMakeSeeder(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a seeder name.\n", 'yellow');
+        echo "Usage: php srin make:seeder <Name>\n";
+        echo "Example: php srin make:seeder UserSeeder\n\n";
+        return;
+    }
+
+    $cleanName = preg_replace('/[^a-zA-Z0-9_]/', '', $name);
+    if (!str_ends_with($cleanName, 'Seeder')) {
+        $cleanName .= 'Seeder';
+    }
+
+    $seedersDir = $baseDir . '/database/seeders';
+    if (!is_dir($seedersDir)) {
+        @mkdir($seedersDir, 0777, true);
+    }
+
+    $seederPath = $seedersDir . "/{$cleanName}.php";
+
+    if (file_exists($seederPath)) {
+        echo color("\n[X] Error: Seeder [{$cleanName}] already exists at database/seeders/{$cleanName}.php\n\n", 'red');
+        return;
+    }
+
+    $template = <<<PHP
+<?php
+
+namespace Database\Seeders;
+
+use Core\Seeder;
+use Core\Database;
+
+class {$cleanName} extends Seeder
+{
+    /**
+     * Run the database seeds.
+     */
+    public function run(): void
+    {
+        // Add your seeder logic here:
+        // Example:
+        // \Model\User::create([
+        //     'name'     => 'Admin',
+        //     'email'    => 'admin@example.com',
+        //     'password' => password_hash('password', PASSWORD_BCRYPT),
+        // ]);
+    }
+}
+PHP;
+
+    file_put_contents($seederPath, $template);
+
+    echo color("\n[✓] Seeder created successfully!\n", 'green');
+    echo "  Location: " . color("database/seeders/{$cleanName}.php", 'cyan') . "\n";
+    echo "  Run via:  " . color("php srin db:seed --class={$cleanName}\n\n", 'yellow');
+}
+
+/**
+ * Handle db:seed command.
+ */
+function handleDbSeed(array $args, string $baseDir): void
+{
+    bootstrapApp($baseDir);
+
+    $className = 'DatabaseSeeder';
+    foreach ($args as $arg) {
+        if (str_starts_with($arg, '--class=')) {
+            $className = trim(substr($arg, 8));
+        }
+    }
+
+    $cleanName = preg_replace('/[^a-zA-Z0-9_\\\\]/', '', $className);
+    if (!str_ends_with($cleanName, 'Seeder')) {
+        $cleanName .= 'Seeder';
+    }
+
+    echo color("\nRunning database seeders...\n", 'yellow');
+
+    $seedersDir = $baseDir . '/database/seeders';
+    $file = $seedersDir . '/' . str_replace(['Database\\Seeders\\', '\\'], ['', '/'], $cleanName) . '.php';
+
+    if (file_exists($file)) {
+        require_once $file;
+    }
+
+    $targetClass = null;
+    $candidates = [
+        $cleanName,
+        "Database\\Seeders\\{$cleanName}",
+        basename(str_replace('\\', '/', $cleanName)),
+        "Database\\Seeders\\" . basename(str_replace('\\', '/', $cleanName)),
+    ];
+
+    foreach ($candidates as $cand) {
+        if (class_exists($cand)) {
+            $targetClass = $cand;
+            break;
+        }
+    }
+
+    if (!$targetClass) {
+        echo color("\n[X] Error: Seeder class [{$cleanName}] not found in database/seeders/.\n\n", 'red');
+        return;
+    }
+
+    try {
+        $seeder = new $targetClass();
+        if (!$seeder instanceof \Core\Seeder) {
+            echo color("\n[X] Error: Class [{$targetClass}] must extend Core\\Seeder.\n\n", 'red');
+            return;
+        }
+
+        $shortName = basename(str_replace('\\', '/', $targetClass));
+        echo "  " . color('[DONE]', 'green') . " Seeded: {$shortName}\n";
+        $seeder->run();
+
+        echo color("\n[✓] Database seeding completed successfully!\n\n", 'green');
+    } catch (\Throwable $e) {
+        echo color("\n[X] Seeding Error: " . $e->getMessage() . "\n\n", 'red');
     }
 }
 
@@ -1047,7 +1191,7 @@ function handleUpgrade(array $args, string $baseDir): void
     }
 
     // Determine local version
-    $localVersion = '1.0.9';
+    $localVersion = '1.1.0';
     if (file_exists($baseDir . '/Core/App.php')) {
         $appCode = (string) file_get_contents($baseDir . '/Core/App.php');
         if (preg_match("/public const VERSION = '([^']+)';/", $appCode, $m)) {
@@ -1427,7 +1571,9 @@ function showHelp(): void
     echo "  " . color("migrate", 'green') . "                        Run all pending database migrations\n";
     echo "  " . color("migrate:rollback", 'green') . "               Rollback the last batch of migrations\n";
     echo "  " . color("migrate:status", 'green') . "                 View migration status table\n";
-    echo "  " . color("migrate:fresh", 'green') . "                  Drop all tables and re-run all migrations\n";
+    echo "  " . color("migrate:fresh [--seed]", 'green') . "         Drop all tables and re-run all migrations (optional: seed)\n";
+    echo "  " . color("make:seeder <Name>", 'green') . "             Create a database seeder in database/seeders/\n";
+    echo "  " . color("db:seed [--class=Name]", 'green') . "         Run database seeders (default: DatabaseSeeder)\n";
     echo "  " . color("make:page <name>", 'green') . "            Create a new frontend page (name.srin.php)\n";
     echo "  " . color("make:layout <name>", 'green') . "          Create a master layout (name.srin.php)\n";
     echo "  " . color("make:partial <name>", 'green') . "         Create a reusable partial (Pages/partials/name.srin.php)\n";

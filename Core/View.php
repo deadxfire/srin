@@ -152,7 +152,7 @@ class View
      * Compile lightweight template directives.
      * Enforces strict XSS escaping on all {{ $expression }} outputs.
      */
-    protected static function compileDirectives(string $template): string
+    public static function compileDirectives(string $template): string
     {
         // 1. Strip secure template comments: {{-- anything --}}
         $template = preg_replace('/\{\{--.*?--\}\}/s', '', $template);
@@ -283,37 +283,37 @@ class View
             $template
         );
 
-        // @if(condition)
-        $template = preg_replace('/(?<!@)@if\s*\((.+?)\)/i', '<?php if ($1): ?>', $template);
-        $template = preg_replace('/(?<!@)@elseif\s*\((.+?)\)/i', '<?php elseif ($1): ?>', $template);
+        // @if(condition) - Supports nested parentheses like @if(is_home()) or @if(!is_route('home'))
+        $template = preg_replace('/(?<!@)@if\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@elseif\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php elseif ($1): ?>', $template);
         $template = preg_replace('/(?<!@)@else\b/i', '<?php else: ?>', $template);
         $template = preg_replace('/(?<!@)@endif\b/i', '<?php endif; ?>', $template);
 
         // @foreach($items as $item)
-        $template = preg_replace('/(?<!@)@foreach\s*\((.+?)\)/i', '<?php foreach ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@foreach\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php foreach ($1): ?>', $template);
         $template = preg_replace('/(?<!@)@endforeach\b/i', '<?php endforeach; ?>', $template);
 
         // @for(...)
-        $template = preg_replace('/(?<!@)@for\s*\((.+?)\)/i', '<?php for ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@for\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php for ($1): ?>', $template);
         $template = preg_replace('/(?<!@)@endfor\b/i', '<?php endfor; ?>', $template);
 
         // @isset($var)
-        $template = preg_replace('/(?<!@)@isset\s*\((.+?)\)/i', '<?php if (isset($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@isset\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (isset($1)): ?>', $template);
         $template = preg_replace('/(?<!@)@endisset\b/i', '<?php endif; ?>', $template);
 
         // @empty($var)
-        $template = preg_replace('/(?<!@)@empty\s*\((.+?)\)/i', '<?php if (empty($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@empty\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (empty($1)): ?>', $template);
         $template = preg_replace('/(?<!@)@endempty\b/i', '<?php endif; ?>', $template);
 
         // @paginate($paginator)
-        $template = preg_replace('/(?<!@)@paginate\s*\((.+?)\);?/i', '<?= ($1)->links() ?>', $template);
+        $template = preg_replace('/(?<!@)@paginate\s*\(((?:[^()]++|\((?1)\))*)\);?/i', '<?= ($1)->links() ?>', $template);
 
         // @while(...)
-        $template = preg_replace('/(?<!@)@while\s*\((.+?)\)/i', '<?php while ($1): ?>', $template);
+        $template = preg_replace('/(?<!@)@while\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php while ($1): ?>', $template);
         $template = preg_replace('/(?<!@)@endwhile\b/i', '<?php endwhile; ?>', $template);
 
         // @unless(...)
-        $template = preg_replace('/(?<!@)@unless\s*\((.+?)\)/i', '<?php if (!($1)): ?>', $template);
+        $template = preg_replace('/(?<!@)@unless\s*\(((?:[^()]++|\((?1)\))*)\)/i', '<?php if (!($1)): ?>', $template);
         $template = preg_replace('/(?<!@)@endunless\b/i', '<?php endif; ?>', $template);
 
         // 8. Restore escaped tokens as literal
@@ -363,7 +363,7 @@ class View
     /**
      * Evaluate compiled template code in an isolated scope.
      */
-    protected static function evaluate(string $code, array $data): string
+    public static function evaluate(string $code, array $data): string
     {
         extract($data, EXTR_SKIP);
 
