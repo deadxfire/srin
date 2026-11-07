@@ -45,9 +45,9 @@ class View
             $rawContent = preg_replace('/^\s*(?<!@)@title\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\);?\r?\n?/mi', '', $rawContent, 1);
         }
 
-        // 3. Extract named content sections (@contentConnect or @contentCconnect)
+        // 3. Extract named content sections (@contentConnect, @connectContent, or @contentCconnect)
         $sections = [];
-        $sectionPattern = '/(?<!@)@(?:contentConnect|contentCconnect)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)(.*?)(?<!@)@(?:endContentConnect|endContentCconnect|endcontentconnect|endcontentcconnect)\b/si';
+        $sectionPattern = '/(?<!@)@(?:contentConnect|contentCconnect|connectContent|connectCcontent)\s*\(\s*[\'"]([^\'"]+)[\'"]\s*\)(.*?)(?<!@)@(?:endContentConnect|endContentCconnect|endConnectContent|endConnectCcontent)\b/si';
 
         $rawContent = preg_replace_callback($sectionPattern, function ($m) use (&$sections, $data) {
             $name = trim($m[1]);
@@ -174,12 +174,20 @@ class View
             '@@content'              => '%%ESCAPED_AT_CONTENT%%',
             '@@contentConnect'       => '%%ESCAPED_AT_CONTENTCONNECT%%',
             '@@contentconnect'       => '%%ESCAPED_AT_CONTENTCONNECT%%',
+            '@@connectContent'       => '%%ESCAPED_AT_CONNECTCONTENT%%',
+            '@@connectcontent'       => '%%ESCAPED_AT_CONNECTCONTENT%%',
             '@@contentCconnect'      => '%%ESCAPED_AT_CONTENTCCONNECT%%',
             '@@contentcconnect'      => '%%ESCAPED_AT_CONTENTCCONNECT%%',
+            '@@connectCcontent'      => '%%ESCAPED_AT_CONNECTCCONNECT%%',
+            '@@connectccontent'      => '%%ESCAPED_AT_CONNECTCCONNECT%%',
             '@@endContentConnect'    => '%%ESCAPED_AT_ENDCONTENTCONNECT%%',
             '@@endcontentconnect'    => '%%ESCAPED_AT_ENDCONTENTCONNECT%%',
+            '@@endConnectContent'    => '%%ESCAPED_AT_ENDCONNECTCONTENT%%',
+            '@@endconnectcontent'    => '%%ESCAPED_AT_ENDCONNECTCONTENT%%',
             '@@endContentCconnect'   => '%%ESCAPED_AT_ENDCONTENTCCONNECT%%',
             '@@endcontentcconnect'   => '%%ESCAPED_AT_ENDCONTENTCCONNECT%%',
+            '@@endConnectCcontent'   => '%%ESCAPED_AT_ENDCONNECTCCONNECT%%',
+            '@@endconnectccontent'   => '%%ESCAPED_AT_ENDCONNECTCCONNECT%%',
             '@@csrf'                 => '%%ESCAPED_AT_CSRF%%',
             '@@honeypot'             => '%%ESCAPED_AT_HONEYPOT%%',
             '@@flash'                => '%%ESCAPED_AT_FLASH%%',
@@ -319,9 +327,13 @@ class View
             '%%ESCAPED_AT_INCLUDE%%'            => '@include',
             '%%ESCAPED_AT_CONTENT%%'            => '@content',
             '%%ESCAPED_AT_CONTENTCONNECT%%'     => '@contentConnect',
+            '%%ESCAPED_AT_CONNECTCONTENT%%'     => '@connectContent',
             '%%ESCAPED_AT_CONTENTCCONNECT%%'    => '@contentCconnect',
+            '%%ESCAPED_AT_CONNECTCCONNECT%%'    => '@connectCcontent',
             '%%ESCAPED_AT_ENDCONTENTCONNECT%%'  => '@endContentConnect',
+            '%%ESCAPED_AT_ENDCONNECTCONTENT%%'  => '@endconnectContent',
             '%%ESCAPED_AT_ENDCONTENTCCONNECT%%' => '@endContentCconnect',
+            '%%ESCAPED_AT_ENDCONNECTCCONNECT%%' => '@endconnectCcontent',
             '%%ESCAPED_AT_CSRF%%'               => '@csrf',
             '%%ESCAPED_AT_HONEYPOT%%'           => '@honeypot',
             '%%ESCAPED_AT_FLASH%%'              => '@flash',

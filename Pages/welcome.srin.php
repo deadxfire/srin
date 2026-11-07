@@ -996,6 +996,11 @@ class ArticleController extends BaseController
                                         <td>Defines custom content block on webpage to inject into matching layout slot.</td>
                                     </tr>
                                     <tr>
+                                        <td><code>@@connectContent('name')</code></td>
+                                        <td><code>@@connectContent('main') ... @@endconnectContent</code></td>
+                                        <td>Alias for <code>@@contentConnect</code> (word-order flexible).</td>
+                                    </tr>
+                                    <tr>
                                         <td><code>@@contentCconnect('name')</code></td>
                                         <td><code>@@contentCconnect('footer') ... @@endContentCconnect</code></td>
                                         <td>Alias for <code>@@contentConnect</code> (supports double-C spelling).</td>

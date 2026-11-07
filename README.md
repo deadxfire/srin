@@ -774,6 +774,7 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 | | `@content('slot', 'fallback')` | `@content('header')` | Declare named injection slot in master layout |
 | | `@content` | `@content` | Main page body placeholder in master layout |
 | | `@contentConnect('slot')` | `@contentConnect('header') ... @endContentConnect` | Define section block to slot into layout |
+| | `@connectContent('slot')` | `@connectContent('main') ... @endconnectContent` | Alias for `@contentConnect` (word-order flexible) |
 | | `@contentCconnect('slot')` | `@contentCconnect('footer') ... @endContentCconnect` | Alias with double-C spelling |
 | **Partials** | `@include('path.file')` | `@include('partials.navbar')` | Include reusable partial template (dot-notation) |
 | | `@include('path', $data)` | `@include('components.card', ['title' => 'Pro'])` | Include partial with custom scoped data |

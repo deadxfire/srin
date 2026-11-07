@@ -371,3 +371,4 @@ class Paginator implements IteratorAggregate, Countable, ArrayAccess, JsonSerial
         return json_encode($this->toArray(), $options);
     }
 }
+
