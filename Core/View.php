@@ -55,10 +55,23 @@ class View
             $rawContent = preg_replace('/^\s*\[(?:layout|connect)\s*[\'"]([^\'"]+)[\'"]\s*\]\r?\n?/mi', '', $rawContent, 1);
         }
 
-        // 2. Detect title directive: [title '...']
-        if (preg_match('/^\s*\[title\s*[\'"]([^\'"]+)[\'"]\s*\]/mi', $rawContent, $titleMatch)) {
-            $data['title'] = $titleMatch[1] ?? '';
-            $rawContent = preg_replace('/^\s*\[title\s*[\'"]([^\'"]+)[\'"]\s*\]\r?\n?/mi', '', $rawContent, 1);
+        // 2. Detect title directive: [title '...'] or dynamic [title $post->title . ' - SrinBlog']
+        if (preg_match('/^\s*\[title\s+(.+?)\]\r?\n?/mi', $rawContent, $titleMatch)) {
+            $rawTitle = trim($titleMatch[1] ?? '');
+            $rawContent = preg_replace('/^\s*\[title\s+(.+?)\]\r?\n?/mi', '', $rawContent, 1);
+
+            // If it's a simple literal string with surrounding quotes: '...' or "..." without concatenation or $
+            if (preg_match('/^([\'"])(.*?)\1$/s', $rawTitle, $qMatch) && !str_contains($qMatch[2], '$') && !str_contains($rawTitle, '.')) {
+                $data['title'] = $qMatch[2];
+            } else {
+                // Dynamic PHP expression (e.g. $post->title . ' - SrinBlog' or "Post: {$post->title}")
+                try {
+                    $data['title'] = self::evaluate("<?= (string)({$rawTitle}) ?>", $data);
+                } catch (\Throwable $e) {
+                    $data['title'] = trim($rawTitle, '\'"');
+                }
+            }
+            $sections['title'] = $data['title'];
         }
 
         // 3. Extract named content sections: [block 'name']...[blockend] or [/block] or [end]
@@ -72,6 +85,11 @@ class View
             $sections[$name] = self::evaluate($compiledBlock, $data);
             return '';
         }, $rawContent);
+
+        // If child page defined a [block 'title'], set $data['title'] automatically
+        if (!empty($sections['title']) && empty($data['title'])) {
+            $data['title'] = trim(strip_tags($sections['title']));
+        }
 
         // 4. Compile and evaluate remaining content (default @content)
         $compiledPage = self::compileDirectives($rawContent);
@@ -114,9 +132,9 @@ class View
         // Compile layout directives (@include, {{ }}, @csrf, etc.)
         $compiledLayout = self::compileDirectives($layoutRaw);
 
-        // 1. Replace named slots: [slot 'name', 'default'] or [slot 'name']
+        // 1. Replace named slots & blockincludes: [slot 'name', 'default'], [blockinclude 'name'], [slot 'name']
         $compiledLayout = preg_replace_callback(
-            '/\[(?:slot|content)\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^\]]+))?\s*\]/i',
+            '/\[(?:slot|content|blockinclude|block_include|blockcontent|yield)\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^\]]+))?\s*\]/i',
             function ($m) {
                 $slot = addslashes(trim($m[1] ?? ''));
                 $defaultParam = trim($m[2] ?? '');
@@ -128,10 +146,10 @@ class View
             $compiledLayout
         );
 
-        // 2. Replace generic slot: [slot] or [content]
+        // 2. Replace generic slot / blockinclude: [slot], [content], [blockinclude]
         $compiledLayout = preg_replace(
-            '/\[(?:slot|content)\]/i',
-            "<?= \$content ?? (\$sections['content'] ?? '') ?>",
+            '/\[(?:slot|content|blockinclude|block_include|blockcontent|yield)\]/i',
+            "<?= \$content ?? (\$sections['content'] ?? (\$sections['main'] ?? '')) ?>",
             $compiledLayout
         );
 
@@ -433,6 +451,24 @@ class View
             $fallback = $base . $sub . DIRECTORY_SEPARATOR . $clean . '.srin.php';
             if (file_exists($fallback)) {
                 return $fallback;
+            }
+        }
+
+        // 3. Normalize singular folder prefixes (e.g. 'layout/main' -> 'layouts/main', 'partial/navbar' -> 'partials/navbar')
+        $normalizedPlural = preg_replace('/^(layout|partial|include|component)(' . preg_quote(DIRECTORY_SEPARATOR, '/') . ')/i', '${1}s$2', $clean);
+        if ($normalizedPlural !== $clean) {
+            $pluralFile = $base . $normalizedPlural . '.srin.php';
+            if (file_exists($pluralFile)) {
+                return $pluralFile;
+            }
+        }
+
+        // 4. Check inside layouts/ after stripping 'layout/' or 'layouts/' prefix
+        $strippedLayout = preg_replace('/^layouts?(' . preg_quote(DIRECTORY_SEPARATOR, '/') . ')/i', '', $clean);
+        if ($strippedLayout !== $clean) {
+            $layoutCandidate = $base . 'layouts' . DIRECTORY_SEPARATOR . $strippedLayout . '.srin.php';
+            if (file_exists($layoutCandidate)) {
+                return $layoutCandidate;
             }
         }
 

@@ -1095,8 +1095,8 @@ class ArticleController extends BaseController
     &lt;p&gt;No projects found.&lt;/p&gt;
 [ifend]</code></pre>
 
-                        <h3>Master Layout with Named Slots: <code>[slot 'name']</code></h3>
-                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>[slot 'slot_name']</code> alongside the primary <code>[slot 'content']</code>:</p>
+                        <h3>Master Layout with Named Slots: <code>[blockinclude 'name']</code> or <code>[slot 'name']</code></h3>
+                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>[blockinclude 'main']</code> or <code>[slot 'slot_name']</code> alongside the primary content slot:</p>
                         <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
@@ -1128,34 +1128,24 @@ class ArticleController extends BaseController
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
 
-                        <h3>Connecting Content on Pages: <code>[layout 'name']</code> &amp; <code>[block 'name']...[blockend]</code></h3>
-                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>[layout 'layouts/main']</code>, and inject custom sections into your layout using <code>[block 'name'] ... [blockend]</code> (or <code>[/block]</code>):</p>
+                        <h3>Connecting Content on Pages: <code>[connect 'layouts/main']</code> &amp; Dynamic Titles</h3>
+                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>[connect 'layouts/main']</code> (or <code>[connect 'main']</code>). You can specify static or dynamic titles, and inject custom blocks using <code>[block 'name'] ... [blockend]</code>:</p>
                         
-                        <pre><code>[layout 'layouts/main']
-[title 'Home Page']
+                        <pre><code>[connect 'layouts/main']
+&lt;!-- Dynamic PHP expression evaluated with controller data: --&gt;
+[title \$article-&gt;title . ' - ' . config('name')]
 
-&lt;!-- 1. Connect Custom Header --&gt;
-[block 'header']
-&lt;header class="hero-header"&gt;
-    [include 'partials.navbar'] &lt;!-- Includes Pages/partials/navbar.srin.php --&gt;
-    &lt;h1&gt;Welcome to @{{ config('name') }}&lt;/h1&gt;
-&lt;/header&gt;
+&lt;!-- Option 1: Wrap page in named block --&gt;
+[block 'main']
+&lt;section class="services"&gt;
+    &lt;h1&gt;@{{ \$article-&gt;title }}&lt;/h1&gt;
+    &lt;p&gt;@{{ \$article-&gt;content }}&lt;/p&gt;
+&lt;/section&gt;
 [blockend]
 
-&lt;!-- 2. Default Main Page Content (Automatically slots into [slot 'content']) --&gt;
-&lt;section class="services"&gt;
-    &lt;h2&gt;Our Services&lt;/h2&gt;
-    &lt;p&gt;This primary content flows directly into the main content slot.&lt;/p&gt;
-
-    &lt;!-- Reusable partial card with custom data --&gt;
-    [include 'components.card', ['title' =&gt; 'Fast Development', 'desc' =&gt; 'Core PHP engine with zero bloat']]
-&lt;/section&gt;
-
-&lt;!-- 3. Connect Custom Footer --&gt;
-[block 'footer']
-&lt;footer class="custom-footer"&gt;
-    &lt;p&gt;&amp;copy; @{{ date('Y') }} Custom Footer for Home Page.&lt;/p&gt;
-&lt;/footer&gt;
+&lt;!-- Push scripts into layout [blockinclude 'scripts'] --&gt;
+[block 'scripts']
+&lt;script&gt;console.log('Page loaded');&lt;/script&gt;
 [blockend]</code></pre>
 
                         <h3>Including Partials: <code>[include 'path.file']</code></h3>
