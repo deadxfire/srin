@@ -10,20 +10,6 @@ Starts with a clean slate: no dummy controllers or unwanted bloat. The default p
 
 ---
 
-## 📖 Official Multipage Documentation
-
-Srin Engine includes a complete, high-detail multipage documentation portal modeled after industry-standard frameworks:
-Navigate to **`http://localhost:8000/docs`** or click **Documentation** in the top navigation bar.
-
-| Category | Chapters |
-| :--- | :--- |
-| **Prologue** | [Introduction & Philosophy](/docs/introduction) • [Installation & Quickstart](/docs/installation) • [Srin CLI Reference](/docs/cli) |
-| **The Basics** | [Routing & Named Routes](/docs/routing) • [Controllers & Actions](/docs/controllers) • [Templates, Layouts & Slots](/docs/views) • [Assets & Direct Image Linking](/docs/assets) |
-| **Database & ORM** | [Database Options & Connections](/docs/database) • [ActiveRecord Models & CRUD](/docs/models) • [QueryBuilder Superpowers](/docs/query-builder) • [Relationships & Eager Loading](/docs/relationships) • [Database Pagination](/docs/pagination) • [Schema & Migrations](/docs/migrations) • [Database Seeders](/docs/seeders) |
-| **Security & Extras** | [Security & Defense-in-Depth](/docs/security) • [Mail Transfer & SMTP](/docs/mailer) • [Global Helpers Reference](/docs/helpers) |
-
----
-
 ## 🚀 Instant Download & Installation via Composer
 
 You can automatically download and scaffold the entire Srin system onto any new computer using Composer:

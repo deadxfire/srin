@@ -94,7 +94,6 @@
             </button>
 
             <nav class="nav-links" id="navLinks">
-                <a href="{{route('docs')}}" style="color: #0284c7; font-weight: 700;">Documentation &rarr;</a>
                 <a href="#quickstart">Quick Start</a>
                 <a href="#assets-guide">Assets</a>
                 <a href="#srin-cli">CLI</a>
@@ -120,8 +119,8 @@
                     A clean, fast Core PHP engine for static sites developed by <strong>Arindam Makar</strong>. Features dynamic extras like mail transfer, Composer packages in <code>Others/</code>, strict <code>.srin.php</code> templates, <code>@Connect</code> layouts, named routes, <code>@{{assets('/path')}}</code> direct linking, and automatic error page rendering.
                 </p>
                 <div class="hero-actions">
-                    <a href="{{route('docs')}}" class="btn btn-primary" style="background: linear-gradient(135deg, #0284c7, #4f46e5); color: #fff; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);">Multipage Documentation &rarr;</a>
-                    <a href="#quickstart" class="btn btn-outline">Quick Start Guide</a>
+                    <a href="#quickstart" class="btn btn-primary">Quick Start Guide</a>
+                    <a href="#error-pages" class="btn btn-outline">Error Pages Guide</a>
                 </div>
             </div>
 

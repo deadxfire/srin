@@ -29,10 +29,6 @@ Router::get('/', function() {
     ]);
 })->name('home');
 
-// Official Multipage Documentation System
-Router::get('/docs', 'DocsController@index')->name('docs');
-Router::get('/docs/{topic}', 'DocsController@show')->name('docs.show');
-
 // Example API status route
 Router::get('/api/status', function() {
     json([
