@@ -131,6 +131,18 @@ class Router
     }
 
     /**
+     * Register a HEAD route with optional direct route name.
+     */
+    public static function head(string $path, mixed $handler, ?string $name = null): Route
+    {
+        $route = self::addRoute('HEAD', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
+    }
+
+    /**
      * Register a POST route with optional direct route name.
      */
     public static function post(string $path, mixed $handler, ?string $name = null): Route
@@ -299,14 +311,15 @@ class Router
                     $result = $action();
                 }
 
+                if (is_string($result)) {
+                    Response::html($result);
+                }
+
                 if ($method === 'HEAD') {
                     ob_end_clean();
                     return;
                 }
 
-                if (is_string($result)) {
-                    Response::html($result);
-                }
                 return;
             }
         }
@@ -378,7 +391,7 @@ class Router
         if (self::$fallbackHandler) {
             Response::status(404);
             $result = self::executeHandler(self::$fallbackHandler);
-            if (is_string($result)) {
+            if (is_string($result) && Request::method() !== 'HEAD') {
                 echo $result;
             }
             return;

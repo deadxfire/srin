@@ -23,7 +23,9 @@ class Response
         if (!headers_sent()) {
             header('Content-Type: application/json; charset=utf-8');
         }
-        echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if (Request::method() !== 'HEAD') {
+            echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        }
         if (class_exists(Igniter::class)) {
             Igniter::trigger('response');
             Igniter::trigger('terminate');
@@ -86,7 +88,9 @@ class Response
         if (!headers_sent()) {
             header('Content-Type: text/html; charset=utf-8');
         }
-        echo $content;
+        if (Request::method() !== 'HEAD') {
+            echo $content;
+        }
     }
 
     /**
@@ -175,6 +179,14 @@ class Response
     public static function renderError(int $code, string $message = ''): void
     {
         self::status($code);
+
+        if (Request::method() === 'HEAD') {
+            if (class_exists(Igniter::class)) {
+                Igniter::trigger('response');
+                Igniter::trigger('terminate');
+            }
+            exit;
+        }
 
         $statusPhrases = [
             400 => 'Bad Request',
