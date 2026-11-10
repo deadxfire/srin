@@ -22,6 +22,8 @@ class QueryBuilder
     protected ?int $offsetValue = null;
     protected ?string $modelClass = null;
     protected array $eagerLoad = [];
+    /** True only when $columns was assembled internally from wrap()'d identifiers. */
+    protected bool $trustedColumns = false;
 
     /**
      * Whitelist of safe comparison operators for WHERE conditions.
@@ -43,45 +45,27 @@ class QueryBuilder
     protected function wrap(string $value): string
     {
         $value = trim($value);
+        $ident = '[A-Za-z_][A-Za-z0-9_]*';
 
         if ($value === '*') {
             return '*';
         }
 
-        // Handle aliased expressions: "col AS alias"
-        if (preg_match('/^(.*?)\s+as\s+(.*)$/i', $value, $matches)) {
-            return $this->wrap($matches[1]) . ' AS ' . $this->wrapValue($matches[2]);
+        // "column AS alias" / "table.column AS alias" (plain identifiers only).
+        if (preg_match('/^(' . $ident . '(?:\.' . $ident . ')*|' . $ident . '\.\*)\s+as\s+(' . $ident . ')$/i', $value, $m)) {
+            return $this->wrap($m[1]) . ' AS `' . $m[2] . '`';
         }
 
-        // Handle DISTINCT prefix: e.g. DISTINCT col
-        if (preg_match('/^DISTINCT\s+(.+)$/i', $value, $matches)) {
-            return 'DISTINCT ' . $this->wrap($matches[1]);
+        // Strict allowlist: identifiers separated by dots, optionally ending in ".*".
+        // Anything else (parentheses, spaces, quotes, comments, subqueries) is rejected
+        // instead of being passed through to the database verbatim.
+        if (!preg_match('/^' . $ident . '(?:\.' . $ident . ')*(?:\.\*)?$/', $value)) {
+            throw new \InvalidArgumentException('Invalid SQL identifier: ' . substr(preg_replace('/[^\x20-\x7E]/', '?', $value), 0, 60));
         }
 
-        // Handle safe aggregate functions: e.g. COUNT(*), SUM(col), COUNT(DISTINCT col), COALESCE(col1, col2)
-        if (preg_match('/^([a-zA-Z_]+)\((.*)\)$/', $value, $matches)) {
-            $func = strtoupper($matches[1]);
-            $allowedFuncs = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT', 'COALESCE'];
-            if (in_array($func, $allowedFuncs, true)) {
-                $argsStr = trim($matches[2]);
-                if ($argsStr === '*') {
-                    return "{$func}(*)";
-                }
-                $rawArgs = array_map('trim', explode(',', $argsStr));
-                $wrappedArgs = array_map(function($arg) {
-                    if ($arg === '*') {
-                        return '*';
-                    }
-                    if (preg_match('/^DISTINCT\s+(.+)$/i', $arg, $dm)) {
-                        return 'DISTINCT ' . $this->wrap($dm[1]);
-                    }
-                    return $this->wrap($arg);
-                }, $rawArgs);
-                return "{$func}(" . implode(', ', $wrappedArgs) . ")";
-            }
-        }
-
-        return $this->wrapValue($value);
+        $parts = explode('.', $value);
+        $wrapped = array_map(fn($part) => $part === '*' ? '*' : '`' . $part . '`', $parts);
+        return implode('.', $wrapped);
     }
 
     /**
@@ -89,31 +73,47 @@ class QueryBuilder
      */
     protected function wrapValue(string $value): string
     {
-        $value = trim($value);
-        if ($value === '*') {
-            return '*';
-        }
-
-        // Validate identifier before any lossy sanitization
-        if (!preg_match('/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/', $value)) {
-            throw new \InvalidArgumentException("Invalid SQL identifier: [{$value}]");
-        }
-
-        $parts = explode('.', $value);
-        $wrapped = array_map(fn($part) => '`' . trim($part) . '`', $parts);
-        return implode('.', $wrapped);
+        return $this->wrap($value);
     }
 
     /**
-     * Sanitize operator against allowed whitelist.
+     * Validate and quote a single (dot-free) column name for INSERT/UPDATE/increment.
+     */
+    protected function ident(string $value): string
+    {
+        $value = trim($value);
+        if (!preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $value)) {
+            throw new \InvalidArgumentException('Invalid column name: ' . substr(preg_replace('/[^\x20-\x7E]/', '?', $value), 0, 60));
+        }
+        return '`' . $value . '`';
+    }
+
+    /**
+     * Sanitize operator against allowed whitelist. Unknown operators are rejected.
      */
     protected function cleanOperator(mixed $operator): string
     {
         $op = strtoupper(trim((string) $operator));
         if (!in_array($op, self::ALLOWED_OPERATORS, true)) {
-            throw new \InvalidArgumentException("Invalid SQL operator: [{$op}]");
+            throw new \InvalidArgumentException('Invalid SQL operator.');
         }
         return $op;
+    }
+
+    /**
+     * Run an aggregate expression on a clone so the caller's builder is not mutated.
+     * $expr must be built only from wrap()'d identifiers (trusted).
+     */
+    protected function aggregate(string $expr): mixed
+    {
+        $q = clone $this;
+        $q->columns = ["{$expr} AS aggregate"];
+        $q->trustedColumns = true;
+        $q->orders = [];
+        $q->limitValue = null;
+        $q->offsetValue = null;
+        $row = Database::select($q->toSql(), $q->bindings);
+        return $row[0]['aggregate'] ?? null;
     }
 
     /**
@@ -122,6 +122,7 @@ class QueryBuilder
     public function select(array|string $columns = ['*']): self
     {
         $this->columns = is_array($columns) ? $columns : func_get_args();
+        $this->trustedColumns = false;
         return $this;
     }
 
@@ -135,21 +136,21 @@ class QueryBuilder
             $operator = '=';
         }
 
-        if ($value === null) {
-            $type = ($operator === '!=' || $operator === '<>') ? 'not_null' : 'null';
-            $this->wheres[] = [
-                'type'    => $type,
-                'boolean' => 'AND',
-                'column'  => $column,
-            ];
-            return $this;
+        $op = $this->cleanOperator($operator);
+
+        // "= NULL" never matches in SQL; translate to IS NULL / IS NOT NULL.
+        if ($value === null && $op === '=') {
+            return $this->whereNull($column, 'AND');
+        }
+        if ($value === null && in_array($op, ['!=', '<>'], true)) {
+            return $this->whereNotNull($column, 'AND');
         }
 
         $this->wheres[] = [
             'type'     => 'basic',
             'boolean'  => 'AND',
             'column'   => $column,
-            'operator' => $this->cleanOperator($operator),
+            'operator' => $op,
             'value'    => $value,
         ];
 
@@ -167,21 +168,20 @@ class QueryBuilder
             $operator = '=';
         }
 
-        if ($value === null) {
-            $type = ($operator === '!=' || $operator === '<>') ? 'not_null' : 'null';
-            $this->wheres[] = [
-                'type'    => $type,
-                'boolean' => 'OR',
-                'column'  => $column,
-            ];
-            return $this;
+        $op = $this->cleanOperator($operator);
+
+        if ($value === null && $op === '=') {
+            return $this->whereNull($column, 'OR');
+        }
+        if ($value === null && in_array($op, ['!=', '<>'], true)) {
+            return $this->whereNotNull($column, 'OR');
         }
 
         $this->wheres[] = [
             'type'     => 'basic',
             'boolean'  => 'OR',
             'column'   => $column,
-            'operator' => $this->cleanOperator($operator),
+            'operator' => $op,
             'value'    => $value,
         ];
 
@@ -385,7 +385,9 @@ class QueryBuilder
      */
     public function toSql(): string
     {
-        $wrappedCols = array_map([$this, 'wrap'], $this->columns);
+        $wrappedCols = $this->trustedColumns
+            ? $this->columns
+            : array_map([$this, 'wrap'], $this->columns);
         $cols = implode(', ', $wrappedCols);
         $table = $this->wrap($this->table);
         $sql = "SELECT {$cols} FROM {$table}";
@@ -527,12 +529,7 @@ class QueryBuilder
      */
     public function count(): int
     {
-        $clone = clone $this;
-        $clone->columns = ['COUNT(*) as aggregate'];
-        $clone->orders = [];
-        $sql = $clone->toSql();
-        $row = Database::select($sql, $clone->bindings);
-        return (int) ($row[0]['aggregate'] ?? 0);
+        return (int) ($this->aggregate('COUNT(*)') ?? 0);
     }
 
     /**
@@ -540,13 +537,8 @@ class QueryBuilder
      */
     public function sum(string $column): int|float
     {
-        $clone = clone $this;
-        $cleanCol = $this->wrap($column);
-        $clone->columns = ["SUM({$cleanCol}) as aggregate"];
-        $clone->orders = [];
-        $sql = $clone->toSql();
-        $row = Database::select($sql, $clone->bindings);
-        return $row[0]['aggregate'] !== null ? (float) $row[0]['aggregate'] : 0;
+        $v = $this->aggregate('SUM(' . $this->wrap($column) . ')');
+        return $v !== null ? (float) $v : 0;
     }
 
     /**
@@ -554,13 +546,8 @@ class QueryBuilder
      */
     public function avg(string $column): int|float
     {
-        $clone = clone $this;
-        $cleanCol = $this->wrap($column);
-        $clone->columns = ["AVG({$cleanCol}) as aggregate"];
-        $clone->orders = [];
-        $sql = $clone->toSql();
-        $row = Database::select($sql, $clone->bindings);
-        return $row[0]['aggregate'] !== null ? (float) $row[0]['aggregate'] : 0;
+        $v = $this->aggregate('AVG(' . $this->wrap($column) . ')');
+        return $v !== null ? (float) $v : 0;
     }
 
     /**
@@ -568,13 +555,7 @@ class QueryBuilder
      */
     public function min(string $column): mixed
     {
-        $clone = clone $this;
-        $cleanCol = $this->wrap($column);
-        $clone->columns = ["MIN({$cleanCol}) as aggregate"];
-        $clone->orders = [];
-        $sql = $clone->toSql();
-        $row = Database::select($sql, $clone->bindings);
-        return $row[0]['aggregate'] ?? null;
+        return $this->aggregate('MIN(' . $this->wrap($column) . ')');
     }
 
     /**
@@ -582,13 +563,7 @@ class QueryBuilder
      */
     public function max(string $column): mixed
     {
-        $clone = clone $this;
-        $cleanCol = $this->wrap($column);
-        $clone->columns = ["MAX({$cleanCol}) as aggregate"];
-        $clone->orders = [];
-        $sql = $clone->toSql();
-        $row = Database::select($sql, $clone->bindings);
-        return $row[0]['aggregate'] ?? null;
+        return $this->aggregate('MAX(' . $this->wrap($column) . ')');
     }
 
     /**
@@ -609,6 +584,7 @@ class QueryBuilder
         $cleanCol = $this->wrap($column);
         $q = clone $this;
         $q->columns = ["DISTINCT {$cleanCol} AS _val"];
+        $q->trustedColumns = true;
         $q->orders = ["_val ASC"];
         $q->limitValue = null;
         $q->offsetValue = null;
@@ -641,6 +617,7 @@ class QueryBuilder
 
         $q = clone $this;
         $q->columns = $cols;
+        $q->trustedColumns = true;
         $rows = Database::select($q->toSql(), $q->bindings);
 
         $result = [];
@@ -659,10 +636,10 @@ class QueryBuilder
      */
     public function increment(string $column, int $amount = 1): int
     {
-        $cleanCol = str_replace(['`', '"', "'", ';', '--'], '', (string) $column);
+        $col = $this->ident($column);
         $whereSql = !empty($this->wheres) ? ' WHERE ' . $this->buildWheres() : '';
         $table = $this->wrap($this->table);
-        $sql = "UPDATE {$table} SET `{$cleanCol}` = `{$cleanCol}` + ?{$whereSql}";
+        $sql = "UPDATE {$table} SET {$col} = {$col} + ?{$whereSql}";
         if (Database::getDriver() === 'pgsql') {
             $sql = str_replace('`', '"', $sql);
         }
@@ -718,7 +695,8 @@ class QueryBuilder
 
         // Clone query for total count without orders, limits, or offsets
         $countQuery = clone $this;
-        $countQuery->columns = ['COUNT(*) as aggregate'];
+        $countQuery->columns = ['COUNT(*) AS aggregate'];
+        $countQuery->trustedColumns = true;
         $countQuery->orders = [];
         $countQuery->limitValue = null;
         $countQuery->offsetValue = null;
@@ -744,7 +722,7 @@ class QueryBuilder
         }
 
         $columns = array_keys($values);
-        $cleanCols = array_map(fn($c) => $this->wrapValue((string) $c), $columns);
+        $cleanCols = array_map(fn($c) => $this->ident((string) $c), $columns);
         $placeholders = array_fill(0, count($columns), '?');
 
         $colsSql = implode(', ', $cleanCols);
@@ -772,7 +750,7 @@ class QueryBuilder
         $bindings = [];
 
         foreach ($values as $col => $val) {
-            $cleanCol = $this->wrapValue((string) $col);
+            $cleanCol = $this->ident((string) $col);
             $sets[] = "{$cleanCol} = ?";
             $bindings[] = $val;
         }
