@@ -689,9 +689,8 @@ class QueryBuilder
             $page = is_numeric($rawPage) ? (int) $rawPage : 1;
         }
 
-        $maxSafePage = (int) floor(PHP_INT_MAX / $perPage);
-        $page = max(1, min($page, $maxSafePage));
-        $offset = (int) (($page - 1) * $perPage);
+        $page = min(max(1, $page), intdiv(PHP_INT_MAX, $perPage));
+        $offset = ($page - 1) * $perPage;
 
         // Clone query for total count without orders, limits, or offsets
         $countQuery = clone $this;
