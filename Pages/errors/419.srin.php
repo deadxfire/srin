@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title ?? '419 - Page Expired', ENT_QUOTES, 'UTF-8') ?></title>
+    <title>[[ $title ?? '419 - Page Expired' ]]</title>
     <link rel="icon" type="image/svg+xml" href="[[ asset('/favicon.svg') ]]">
     <link rel="alternate icon" href="[[ asset('/favicon.ico') ]]">
     <style>
@@ -21,10 +21,9 @@
     <div class="card">
         <div class="badge">419</div>
         <h1>Page Expired</h1>
-        <p><?= htmlspecialchars($message ?? 'Your session or CSRF security token has expired. Please refresh the page and try submitting again.', ENT_QUOTES, 'UTF-8') ?></p>
+        <p>[[ $message ?? 'Your session or CSRF security token has expired. Please refresh the page and try submitting again.' ]]</p>
         <a href="javascript:location.reload()" class="btn">&#x21bb; Refresh Page</a>
         <div class="credit">Srin Engine &bull; Developed by <a href="https://github.com/deadxfire" target="_blank" style="color: inherit; text-decoration: underline;">Arindam Makar</a></div>
     </div>
 </body>
 </html>
-

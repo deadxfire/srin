@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars($title ?? '404 - Page Not Found', ENT_QUOTES, 'UTF-8') ?></title>
+    <title>[[ $title ?? '404 - Page Not Found' ]]</title>
     <link rel="icon" type="image/svg+xml" href="[[ asset('/favicon.svg') ]]">
     <link rel="alternate icon" href="[[ asset('/favicon.ico') ]]">
     <style>
@@ -21,8 +21,8 @@
     <div class="card">
         <div class="badge">404</div>
         <h1>Page Not Found</h1>
-        <p><?= htmlspecialchars($message ?? 'The page or asset you requested does not exist or has been moved.', ENT_QUOTES, 'UTF-8') ?></p>
-        <a href="<?= url('/') ?>" class="btn">&larr; Return Home</a>
+        <p>[[ $message ?? 'The page or asset you requested does not exist or has been moved.' ]]</p>
+        <a href="[[ url('/') ]]" class="btn">&larr; Return Home</a>
         <div class="credit">Srin Engine &bull; Developed by <a href="https://github.com/deadxfire" target="_blank" style="color: inherit; text-decoration: underline;">Arindam Makar</a></div>
     </div>
 </body>

@@ -8,7 +8,7 @@ use Exception;
  * ============================================================================
  * Srin Engine - Checkpoint System (Linear Request Verification Gate)
  * ============================================================================
- * An intuitive, linear alternative to traditional onion middleware.
+ * Clean, intuitive, linear request verification and security gate.
  *
  * Instead of nested closure hell ($next($request)), a Checkpoint implements:
  *   - enter(): Return true to ALLOW passage (default deny: false, null, or void halts passage).

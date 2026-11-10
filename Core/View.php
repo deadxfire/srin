@@ -214,11 +214,11 @@ class View
         // Compile layout directives ([include], [[ ]], [csrf], etc.)
         $compiledLayout = self::compileDirectives($layoutRaw);
 
-        // 1. Replace named slots & blockincludes: [slot 'name', 'default'], [blockinclude 'name'], [slot 'name']
+        // 1. Replace named slots & content blocks: [slot 'name', 'default'], [slot 'name']
         $compiledLayout = preg_replace_callback(
-            '/\[(?:slot|content|blockinclude|block_include|blockcontent|yield)\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^\]]+))?\s*\]/i',
+            '/\[(?:slot|content)\s*[\'"]([^\'"]+)[\'"](?:\s*,\s*([\'"].*?[\'"]|[^\]]+))?\s*\]/i',
             function ($m) {
-                $slot = addslashes(trim($m[1] ?? ''));
+                $slot = preg_replace('/[^a-zA-Z0-9_\-]/', '', trim($m[1] ?? ''));
                 $defaultParam = trim($m[2] ?? '');
                 if ($defaultParam !== '') {
                     return "<?= \$sections['{$slot}'] ?? ({$defaultParam}) ?>";
@@ -228,9 +228,9 @@ class View
             $compiledLayout
         );
 
-        // 2. Replace generic slot / blockinclude: [slot], [content], [blockinclude]
+        // 2. Replace generic slot: [slot] or [content]
         $compiledLayout = preg_replace(
-            '/\[(?:slot|content|blockinclude|block_include|blockcontent|yield)\]/i',
+            '/\[(?:slot|content)\]/i',
             "<?= \$content ?? (\$sections['content'] ?? (\$sections['main'] ?? '')) ?>",
             $compiledLayout
         );
@@ -283,7 +283,7 @@ class View
     protected static function extractSections(string $content, array $data): array
     {
         $sections = [];
-        $pattern = '/(\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\])|(\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section))\])/i';
+        $pattern = '/(\[block\s*[\'"]([^\'"]+)[\'"]\s*\])|(\[(?:blockend|\/block)\])/i';
 
         if (!preg_match_all($pattern, $content, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
             return [$content, $sections];
@@ -333,7 +333,7 @@ class View
     }
 
     /**
-     * Scan and compile output tags ([[ ]], [{ }], {{ }}) and escaped tags (@[[, @[{, @{{).
+     * Scan and compile Srin output tags ([[ ]], [{ }]) and escaped tags (@[[, @[{).
      * Uses a character scanner tracking bracket depth and quotes to prevent premature truncation
      * on nested array keys like [[ $a[$b[0]] ]].
      */
@@ -344,7 +344,7 @@ class View
         $i = 0;
 
         while ($i < $len) {
-            // 1. Escaped tags: @[[ ... ]], @[{ ... }], @{{ ... }}, @@[[ ... ]], @@[{ ... }], @@{{ ... }}
+            // 1. Escaped tags: @[[ ... ]], @[{ ... }], @@[[ ... ]], @@[{ ... }]
             $isDoubleAt = false;
             $tagOffset = -1;
             $escAt = '%%ESCAPED_AT_SYMBOL%%';
@@ -607,31 +607,18 @@ class View
     /**
      * Compile native Srin template directives.
      * Compiles native Srin Tags ([if], [each], [else], [empty], [end], [block], [include], [csrf], [honeypot], [paginate])
-     * and output tags ([[ $expr ]] auto-escaped, [{ $expr }] raw, {{ $expr }} auto-escaped).
+     * and output tags ([[ $expr ]] auto-escaped, [{ $expr }] raw).
      * Enforces strict XSS escaping on dynamic outputs.
      */
     public static function compileDirectives(string $template): string
     {
-        // Protect @@ escapes so they are not treated as directives
+        // Protect @@ escapes so they are output as a single @
         $template = preg_replace('/@@/', '%%ESCAPED_AT_SYMBOL%%', $template);
-
-        // 0. Strict check: Disallow unsupported directives (only when used as actual directives, not plain text like "@for")
-        $directivesWithParens = 'if|elseif|foreach|for|while|unless|isset|empty|switch|case|include|extends|yield|section|push|stack|component|slot';
-        $standaloneDirectives = 'endif|endforeach|endfor|endwhile|endunless|endisset|endempty|endswitch|endsection|endpush|endcomponent|endslot|csrf|honeypot|method';
-
-        if (
-            preg_match('/^\s*@(' . $directivesWithParens . ')\s*\(/mi', $template, $unsupportedMatch)
-            || preg_match('/^\s*@(' . $standaloneDirectives . ')\b/mi', $template, $unsupportedMatch)
-            || preg_match('/(?<!\w)@(' . $directivesWithParens . ')\s*\(/i', $template, $unsupportedMatch)
-        ) {
-            $directive = trim($unsupportedMatch[0]);
-            throw new Exception("Srin Template Error: Unsupported syntax '{$directive}'. Srin Engine uses native Srin Tags: [if ...], [each ...], [end], [layout '...'], [include '...'], [csrf], [honeypot].");
-        }
 
         // 1. Strip comments: [-- ... --]
         $template = preg_replace('/\[--.*?--\]/s', '', $template);
 
-        // 2. Scan and compile output tags ([[ ]], [{ }], {{ }}) and escaped tags (@[[, @[{, @{{)
+        // 2. Scan and compile output tags ([[ ]], [{ }]) and escaped tags (@[[, @[{)
         // Uses a character scanner tracking bracket depth and quotes to prevent premature truncation on nested array keys like [[ $a[$b[0]] ]]
         $escapedTokens = [];
         $template = self::scanOutputTags($template, $escapedTokens);
@@ -676,7 +663,7 @@ class View
         // 6. Control Flow Engine with Universal & Named Closers Stack (Balanced PCRE Brackets)
         $controlPattern = '/('
             . '\[(if|elseif|each|for|while|unless|isset)\s+((?:[^\[\]]++|\[(?3)\])*)\]'
-            . '|\[(else|empty|end|ifend|\/if|endif|eachend|\/each|endeach|unlessend|endless|\/unless|endunless|issetend|\/isset|endisset|forend|\/for|endfor|whileend|\/while|endwhile|blockend|\/block|endblock|sectionend|\/section|endsection)\]'
+            . '|\[(else|empty|end|ifend|\/if|eachend|\/each|unlessend|\/unless|issetend|\/isset|forend|\/for|whileend|\/while|blockend|\/block)\]'
             . ')/i';
 
         $stack = [];
@@ -685,23 +672,18 @@ class View
         $tagMap = [
             'ifend'     => 'if',
             '/if'       => 'if',
-            'endif'     => 'if',
             'eachend'   => 'each',
             '/each'     => 'each',
-            'endeach'   => 'each',
             'unlessend' => 'unless',
-            'endless'   => 'unless',
             '/unless'   => 'unless',
-            'endunless' => 'unless',
             'issetend'  => 'isset',
             '/isset'    => 'isset',
-            'endisset'  => 'isset',
             'forend'    => 'for',
             '/for'      => 'for',
-            'endfor'    => 'for',
             'whileend'  => 'while',
             '/while'    => 'while',
-            'endwhile'  => 'while',
+            'blockend'  => 'block',
+            '/block'    => 'block',
         ];
 
         $template = preg_replace_callback($controlPattern, function ($m) use (&$stack, &$eachCounter, $tagMap) {
@@ -759,7 +741,7 @@ class View
                 }
 
                 // Block closings that appear standalone in compiled content
-                if (in_array($tag, ['blockend', '/block', 'endblock', 'sectionend', '/section', 'endsection'], true)) {
+                if (in_array($tag, ['blockend', '/block'], true)) {
                     return '';
                 }
 

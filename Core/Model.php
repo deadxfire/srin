@@ -362,7 +362,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * Pick a single model by primary key or automatically render 404.
-     * Expressive Srin alternative to findOrFail().
      */
     public static function pick(int|string $id): static
     {
@@ -371,7 +370,6 @@ abstract class Model implements ArrayAccess, JsonSerializable
 
     /**
      * Insert and persist a new model instance.
-     * Expressive Srin alternative to create().
      */
     public static function insert(array $attributes): static
     {
