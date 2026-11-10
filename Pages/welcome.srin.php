@@ -116,7 +116,7 @@
                 </div>
                 <h1>Srin Engine for Static Websites</h1>
                 <p class="lead">
-                    A clean, fast Core PHP engine for static sites developed by <strong>Arindam Makar</strong>. Features dynamic extras like mail transfer, Composer packages in <code>Others/</code>, strict <code>.srin.php</code> templates, <code>@Connect</code> layouts, named routes, <code>@{{assets('/path')}}</code> direct linking, and automatic error page rendering.
+                    A clean, fast Core PHP engine for static sites developed by <strong>Arindam Makar</strong>. Features dynamic extras like mail transfer, Composer packages in <code>Others/</code>, strict <code>.srin.php</code> templates, <code>&#91;connect&#93;</code> layouts, named routes, <code>@[[ asset('/path') ]]</code> direct linking, and automatic error page rendering.
                 </p>
                 <div class="hero-actions">
                     <a href="#quickstart" class="btn btn-primary">Quick Start Guide</a>
@@ -246,7 +246,7 @@ assets/images/banner.jpg</code></pre>
                             </div>
                             <div class="structure-item">
                                 <strong>Pages/</strong>
-                                <p>Your frontend <code>.srin.php</code> templates and master layouts. Connect any page to a layout using <code>@Connect('layouts/main')</code>.</p>
+                                <p>Your frontend <code>.srin.php</code> templates and master layouts. Connect any page to a layout using <code>&#91;connect 'layouts/main'&#93;</code>.</p>
                             </div>
                             <div class="structure-item">
                                 <strong>Routes/</strong>
@@ -284,11 +284,11 @@ php srin migrate:fresh     # Drop all tables and re-run all migrations</code></p
 
                         <h3>Create a New Frontend Page (<code>.srin.php</code>)</h3>
                         <pre><code>php srin make:page about</code></pre>
-                        <p>Generates <code>Pages/about.srin.php</code> pre-connected to <code>@Connect('layouts/main')</code>.</p>
+                        <p>Generates <code>Pages/about.srin.php</code> pre-connected to <code>&#91;connect 'layouts/main'&#93;</code>.</p>
 
                         <h3>Create a New Layout</h3>
                         <pre><code>php srin make:layout admin</code></pre>
-                        <p>Generates <code>Pages/layouts/admin.srin.php</code> pre-wired with <code>{{assets('/css/style.css')}}</code> and <code>@content</code>.</p>
+                        <p>Generates <code>Pages/layouts/admin.srin.php</code> pre-wired with <code>[[ asset('/css/style.css') ]]</code> and <code>&#91;slot&#93;</code>.</p>
 
                         <h3>Create Custom Error Page</h3>
                         <pre><code>php srin make:error 404</code></pre>
@@ -1051,38 +1051,38 @@ class ArticleController extends BaseController
 
                     <!-- 7. Pages & Layouts -->
                     <section id="templates" class="doc-card">
-                        <h2>7. <code>.srin.php</code> Templates, <code>&#123;&#123; &#125;&#125;</code> Syntax &amp; <code>@Connect</code></h2>
+                        <h2>7. <code>.srin.php</code> Templates, <code>&#91;&#91; &#93;&#93;</code> Syntax &amp; <code>&#91;connect&#93;</code></h2>
                         <div class="highlight-box">
                             <strong>Strict Template Format:</strong> All views, layouts, and partials in Srin Engine <strong>must use the <code>.srin.php</code> extension</strong> (e.g. <code>Pages/portfolio.srin.php</code>). Standard <code>.php</code> files (like <code>Pages/portfolio.php</code>) are intentionally rejected and will not work.
                         </div>
 
-                        <h3>Running PHP Code via <code>&#123;&#123; &#125;&#125;</code> (Auto-Escaped &amp; XSS-Safe):</h3>
-                        <p>Whenever you need to run PHP code or display data inside any <code>.srin.php</code> template, use <code>&#123;&#123; &#125;&#125;</code>. Srin Engine automatically passes all outputs through <code>htmlspecialchars()</code> with <code>ENT_QUOTES</code> for complete defense against XSS:</p>
+                        <h3>Running PHP Code via <code>&#91;&#91; &#93;&#93;</code> (Auto-Escaped &amp; XSS-Safe):</h3>
+                        <p>Whenever you need to run PHP code or display data inside any <code>.srin.php</code> template, use <code>&#91;&#91; &#93;&#93;</code> (or <code>&#123;&#123; &#125;&#125;</code>). Srin Engine automatically passes all outputs through <code>htmlspecialchars()</code> with <code>ENT_QUOTES</code> for complete defense against XSS:</p>
                         <pre><code>&lt;!-- Variables &amp; Expressions --&gt;
-&lt;h1&gt;Welcome, @{{ \$name }}!&lt;/h1&gt;
-&lt;p&gt;Copyright &copy; @{{ date('Y') }} @{{ config('name') }}&lt;/p&gt;
-&lt;span&gt;Total Items: @{{ count(\$projects) }}&lt;/span&gt;
+&lt;h1&gt;Welcome, @[[ \$name ]]!&lt;/h1&gt;
+&lt;p&gt;Copyright &copy; @[[ date('Y') ]] @[[ config('name') ]]&lt;/p&gt;
+&lt;span&gt;Total Items: @[[ count(\$projects) ]]&lt;/span&gt;
 
 &lt;!-- Safe Asset &amp; Route Linking --&gt;
-&lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
-&lt;a href="@{{route('home')}}"&gt;Home&lt;/a&gt;
+&lt;link rel="stylesheet" href="@[[ asset('/css/style.css') ]]"&gt;
+&lt;a href="@[[ route('home') ]]"&gt;Home&lt;/a&gt;
 
 &lt;!-- Raw HTML (when unescaped output is explicitly intended) --&gt;
-&lt;div&gt;@{!! \$trustedHtml !!}&lt;/div&gt;
+&lt;div&gt;@[{ \$trustedHtml }]&lt;/div&gt;
 
 &lt;!-- Secure Comments (stripped completely from client output) --&gt;
-@{{-- This comment is never visible in page source --}}
+@[-- This comment is never visible in page source --]
 
 &lt;!-- Frontend JS Framework Escaping (Vue / Alpine / React) --&gt;
-&lt;span&gt;@@{{ clientVar }}&lt;/span&gt; &lt;!-- Renders literally as @{{ clientVar }} --&gt;</code></pre>
+&lt;span&gt;@@[[ clientVar ]]&lt;/span&gt; &lt;!-- Renders literally as @[[ clientVar ]] --&gt;</code></pre>
 
                         <h3>Secure Form Directives:</h3>
-                        <pre><code>&lt;form action="@{{route('contact.send')}}" method="POST"&gt;
-    [csrf]       &lt;!-- Injects CSRF token protection --&gt;
-    [honeypot]   &lt;!-- Injects invisible bot trap to block spam bots --&gt;
+                        <pre><code>&lt;form action="@[[ route('contact.send') ]]" method="POST"&gt;
+    &#91;csrf&#93;       &lt;!-- Injects CSRF token protection --&gt;
+    &#91;honeypot&#93;   &lt;!-- Injects invisible bot trap to block spam bots --&gt;
 
-    &lt;input type="text" name="name" value="@{{ old('name') }}" required&gt;
-    &lt;input type="email" name="email" value="@{{ old('email') }}" required&gt;
+    &lt;input type="text" name="name" value="@[[ old('name') ]]" required&gt;
+    &lt;input type="email" name="email" value="@[[ old('email') ]]" required&gt;
     &lt;button type="submit"&gt;Send Message&lt;/button&gt;
 &lt;/form&gt;</code></pre>
 
@@ -1095,41 +1095,41 @@ class ArticleController extends BaseController
     &lt;p&gt;No projects found.&lt;/p&gt;
 &#91;ifend&#93;</code></pre>
 
-                        <h3>Master Layout with Named Slots: <code>[blockinclude 'name']</code> or <code>[slot 'name']</code></h3>
-                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>[blockinclude 'main']</code> or <code>[slot 'slot_name']</code> alongside the primary content slot:</p>
+                        <h3>Master Layout with Named Slots: <code>&#91;slot 'name'&#93;</code></h3>
+                        <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>&#91;slot 'slot_name'&#93;</code> alongside the primary content slot:</p>
                         <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html lang="en"&gt;
 &lt;head&gt;
-    &lt;title&gt;@{{ \$title ?? config('name') }}&lt;/title&gt;
-    &lt;link rel="icon" type="image/svg+xml" href="@{{assets('/favicon.svg')}}"&gt;
-    &lt;link rel="stylesheet" href="@{{assets('/css/style.css')}}"&gt;
-    [slot 'styles'] &lt;!-- Optional page styles --&gt;
+    &lt;title&gt;@[[ \$title ?? config('name') ]]&lt;/title&gt;
+    &lt;link rel="icon" type="image/svg+xml" href="@[[ asset('/favicon.svg') ]]"&gt;
+    &lt;link rel="stylesheet" href="@[[ asset('/css/style.css') ]]"&gt;
+    &#91;slot 'styles'&#93; &lt;!-- Optional page styles --&gt;
 &lt;/head&gt;
 &lt;body&gt;
     &lt;!-- Header Slot --&gt;
-    [slot 'header']
+    &#91;slot 'header'&#93;
 
     &lt;main class="container"&gt;
-        [flash 'success']
-        [flash 'error']
+        &#91;flash 'success'&#93;
+        &#91;flash 'error'&#93;
         
         &lt;!-- Default Main Page Content --&gt;
-        [slot 'content']
+        &#91;slot 'content'&#93;
     &lt;/main&gt;
 
     &lt;!-- Sidebar with optional fallback HTML --&gt;
-    [slot 'sidebar', '&lt;aside&gt;Default Sidebar Content&lt;/aside&gt;']
+    &#91;slot 'sidebar', '&lt;aside&gt;Default Sidebar Content&lt;/aside&gt;'&#93;
 
     &lt;!-- Footer Slot --&gt;
-    [slot 'footer']
+    &#91;slot 'footer'&#93;
 
-    &lt;script src="@{{assets('/js/main.js')}}"&gt;&lt;/script&gt;
-    [slot 'scripts'] &lt;!-- Optional page scripts --&gt;
+    &lt;script src="@[[ asset('/js/main.js') ]]"&gt;&lt;/script&gt;
+    &#91;slot 'scripts'&#93; &lt;!-- Optional page scripts --&gt;
 &lt;/body&gt;
 &lt;/html&gt;</code></pre>
 
-                        <h3>Connecting Content on Pages: <code>[connect 'layouts/main']</code> &amp; Dynamic Titles</h3>
-                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>[connect 'layouts/main']</code> (or <code>[connect 'main']</code>). You can specify static or dynamic titles, and inject custom blocks using <code>[block 'name'] ... [blockend]</code>:</p>
+                        <h3>Connecting Content on Pages: <code>&#91;connect 'layouts/main'&#93;</code> &amp; Dynamic Titles</h3>
+                        <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>&#91;connect 'layouts/main'&#93;</code> (or <code>&#91;connect 'main'&#93;</code>). You can specify static or dynamic titles, and inject custom blocks using <code>&#91;block 'name'&#93; ... &#91;blockend&#93;</code>:</p>
                         
                         <pre><code>&#91;connect 'layouts/main'&#93;
 &lt;!-- Dynamic PHP expression evaluated with controller data: --&gt;
@@ -1143,20 +1143,20 @@ class ArticleController extends BaseController
 &lt;/section&gt;
 &#91;blockend&#93;
 
-&lt;!-- Push scripts into layout [blockinclude 'scripts'] --&gt;
+&lt;!-- Push scripts into layout &#91;slot 'scripts'&#93; --&gt;
 &#91;block 'scripts'&#93;
 &lt;script&gt;console.log('Page loaded');&lt;/script&gt;
 &#91;blockend&#93;</code></pre>
 
-                        <h3>Including Partials: <code>[include 'path.file']</code></h3>
-                        <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>[include 'partials.navbar']</code> or <code>[include 'components.card']</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
+                        <h3>Including Partials: <code>&#91;include 'path.file'&#93;</code></h3>
+                        <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>&#91;include 'partials.navbar'&#93;</code> or <code>&#91;include 'components.card'&#93;</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
 
                         <pre><code>&lt;!-- Direct partial include with inherited page variables --&gt;
-[include 'partials.navbar']      &lt;!-- Resolves to Pages/partials/navbar.srin.php --&gt;
-[include 'includes.sidebar']     &lt;!-- Resolves to Pages/includes/sidebar.srin.php --&gt;
+&#91;include 'partials.navbar'&#93;      &lt;!-- Resolves to Pages/partials/navbar.srin.php --&gt;
+&#91;include 'includes.sidebar'&#93;     &lt;!-- Resolves to Pages/includes/sidebar.srin.php --&gt;
 
 &lt;!-- Passing custom variables into the partial --&gt;
-[include 'components.product-card', [
+&#91;include 'components.product-card', [
     'title' =&gt; 'Srin Engine Pro',
     'price' =&gt; 99.00,
     'badge' =&gt; 'Popular'
@@ -1179,28 +1179,28 @@ class ArticleController extends BaseController
                                         <td colspan="3">1. Layouts, Slots &amp; Titles</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[layout 'layouts/name']</code></td>
-                                        <td><code>[layout 'layouts/main']</code></td>
+                                        <td><code>&#91;layout 'layouts/name'&#93;</code></td>
+                                        <td><code>&#91;layout 'layouts/main'&#93;</code></td>
                                         <td>Connects a child webpage to a master layout template in <code>Pages/layouts/</code>.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[title 'Page Title']</code></td>
-                                        <td><code>[title 'Dashboard - Analytics']</code></td>
+                                        <td><code>&#91;title 'Page Title'&#93;</code></td>
+                                        <td><code>&#91;title 'Dashboard - Analytics'&#93;</code></td>
                                         <td>Sets the page title variable <code>\$title</code> for the layout.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[slot 'name', 'fallback']</code></td>
-                                        <td><code>[slot 'header', '&lt;div&gt;Default&lt;/div&gt;']</code></td>
+                                        <td><code>&#91;slot 'name', 'fallback'&#93;</code></td>
+                                        <td><code>&#91;slot 'header', '&lt;div&gt;Default&lt;/div&gt;'&#93;</code></td>
                                         <td>Defines a named slot in master layout with optional fallback content.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[slot 'content']</code></td>
-                                        <td><code>[slot 'content']</code></td>
+                                        <td><code>&#91;slot 'content'&#93;</code></td>
+                                        <td><code>&#91;slot 'content'&#93;</code></td>
                                         <td>Injects primary child page content into the layout.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[block 'name'] ... [blockend]</code></td>
-                                        <td><code>[block 'header'] ... [blockend]</code> (or <code>[/block]</code>)</td>
+                                        <td><code>&#91;block 'name'&#93; ... &#91;blockend&#93;</code></td>
+                                        <td><code>&#91;block 'header'&#93; ... &#91;blockend&#93;</code> (or <code>&#91;/block&#93;</code>)</td>
                                         <td>Defines custom content block on webpage to inject into matching layout slot.</td>
                                     </tr>
 
@@ -1208,13 +1208,13 @@ class ArticleController extends BaseController
                                         <td colspan="3">2. Partials &amp; Components</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[include 'path.file']</code></td>
-                                        <td><code>[include 'partials.navbar']</code></td>
+                                        <td><code>&#91;include 'path.file'&#93;</code></td>
+                                        <td><code>&#91;include 'partials.navbar'&#93;</code></td>
                                         <td>Directly includes a reusable partial view. Supports dot-notation and slash paths.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[include 'name', \$data]</code></td>
-                                        <td><code>[include 'components.card', ['title' =&gt; 'Pro']]</code></td>
+                                        <td><code>&#91;include 'name', \$data&#93;</code></td>
+                                        <td><code>&#91;include 'components.card', ['title' =&gt; 'Pro']&#93;</code></td>
                                         <td>Includes a partial while passing custom scoped variables.</td>
                                     </tr>
 
@@ -1222,13 +1222,13 @@ class ArticleController extends BaseController
                                         <td colspan="3">3. Database &amp; UI Controls</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[paginate \$paginator]</code></td>
-                                        <td><code>[paginate \$articles]</code></td>
+                                        <td><code>&#91;paginate \$paginator&#93;</code></td>
+                                        <td><code>&#91;paginate \$articles&#93;</code></td>
                                         <td>Renders modern, responsive HTML pagination controls with numbered pills &amp; prev/next links.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[flash 'key']</code></td>
-                                        <td><code>[flash 'success']</code>, <code>[flash 'error']</code></td>
+                                        <td><code>&#91;flash 'key'&#93;</code></td>
+                                        <td><code>&#91;flash 'success'&#93;</code>, <code>&#91;flash 'error'&#93;</code></td>
                                         <td>Automatically renders session flash message alerts if present.</td>
                                     </tr>
 
@@ -1236,28 +1236,28 @@ class ArticleController extends BaseController
                                         <td colspan="3">4. Security &amp; Anti-Hacking Directives</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[csrf]</code></td>
-                                        <td><code>[csrf]</code></td>
+                                        <td><code>&#91;csrf&#93;</code></td>
+                                        <td><code>&#91;csrf&#93;</code></td>
                                         <td>Renders hidden cryptographic CSRF protection input field inside forms.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[honeypot]</code></td>
-                                        <td><code>[honeypot]</code></td>
+                                        <td><code>&#91;honeypot&#93;</code></td>
+                                        <td><code>&#91;honeypot&#93;</code></td>
                                         <td>Renders invisible anti-bot honeypot input field to trap automated spam bots.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[[ \$expression ]]</code></td>
-                                        <td><code>[[ \$article-&gt;title ]]</code></td>
+                                        <td><code>&#91;&#91; \$expression &#93;&#93;</code></td>
+                                        <td><code>&#91;&#91; \$article-&gt;title &#93;&#93;</code></td>
                                         <td>Srin Double-Bracket: Evaluates PHP and auto-escapes output with <code>htmlspecialchars</code>. Zero Vue/Alpine collision!</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[{ \$trustedHtml }]</code></td>
-                                        <td><code>[{ \$article-&gt;body }]</code></td>
+                                        <td><code>&#91;{ \$trustedHtml }&#93;</code></td>
+                                        <td><code>&#91;{ \$article-&gt;body }&#93;</code></td>
                                         <td>Srin HTML Compile: Renders raw, unescaped HTML content (for trusted rich text editors, markdown).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[-- comment --]</code></td>
-                                        <td><code>[-- Internal notes --]</code></td>
+                                        <td><code>&#91;-- comment --&#93;</code></td>
+                                        <td><code>&#91;-- Internal notes --&#93;</code></td>
                                         <td>Server-side comment, completely stripped and omitted from HTML source code.</td>
                                     </tr>
                                     <tr>
@@ -1270,97 +1270,97 @@ class ArticleController extends BaseController
                                         <td colspan="3">5. Template Control Flow Directives (Srin Tags &amp; Descriptive Closers)</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[if condition] ... [ifend]</code></td>
-                                        <td><code>[if \$count &gt; 0] ... [else] ... [ifend]</code> (or <code>[/if]</code>)</td>
-                                        <td>Standard conditional branching with descriptive <code>[ifend]</code> or HTML-style <code>[/if]</code>.</td>
+                                        <td><code>&#91;if condition&#93; ... &#91;ifend&#93;</code></td>
+                                        <td><code>&#91;if \$count &gt; 0&#93; ... &#91;else&#93; ... &#91;ifend&#93;</code> (or <code>&#91;/if&#93;</code>)</td>
+                                        <td>Standard conditional branching with descriptive <code>&#91;ifend&#93;</code> or HTML-style <code>&#91;/if&#93;</code>.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[unless condition] ... [unlessend]</code></td>
-                                        <td><code>[unless \$loggedIn] ... [endless]</code> (or <code>[unlessend]</code>, <code>[/unless]</code>)</td>
+                                        <td><code>&#91;unless condition&#93; ... &#91;unlessend&#93;</code></td>
+                                        <td><code>&#91;unless \$loggedIn&#93; ... &#91;endless&#93;</code> (or <code>&#91;unlessend&#93;</code>, <code>&#91;/unless&#93;</code>)</td>
                                         <td>Inverted condition (executes when condition is false).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[isset \$variable] ... [issetend]</code></td>
-                                        <td><code>[isset \$user-&gt;bio] ... [issetend]</code> (or <code>[/isset]</code>)</td>
+                                        <td><code>&#91;isset \$variable&#93; ... &#91;issetend&#93;</code></td>
+                                        <td><code>&#91;isset \$user-&gt;bio&#93; ... &#91;issetend&#93;</code> (or <code>&#91;/isset&#93;</code>)</td>
                                         <td>Checks if a variable is set and not null.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[each \$items as \$item] ... [eachend]</code></td>
-                                        <td><code>[each \$posts as \$post] ... [eachend]</code> (or <code>[/each]</code>)</td>
-                                        <td>Iterates over arrays, collections, or paginators with dedicated <code>[eachend]</code> closer.</td>
+                                        <td><code>&#91;each \$items as \$item&#93; ... &#91;eachend&#93;</code></td>
+                                        <td><code>&#91;each \$posts as \$post&#93; ... &#91;eachend&#93;</code> (or <code>&#91;/each&#93;</code>)</td>
+                                        <td>Iterates over arrays, collections, or paginators with dedicated <code>&#91;eachend&#93;</code> closer.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[each] ... [empty] ... [eachend]</code></td>
-                                        <td><code>[each \$posts as \$p] ... [empty] ... [eachend]</code></td>
+                                        <td><code>&#91;each&#93; ... &#91;empty&#93; ... &#91;eachend&#93;</code></td>
+                                        <td><code>&#91;each \$posts as \$p&#93; ... &#91;empty&#93; ... &#91;eachend&#93;</code></td>
                                         <td>Iterate with automatic fallback when collection is empty (no forelse needed!).</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[for ...] ... [forend]</code></td>
-                                        <td><code>[for \$i = 1; \$i &lt;= 5; \$i++] ... [forend]</code> (or <code>[/for]</code>)</td>
+                                        <td><code>&#91;for ...&#93; ... &#91;forend&#93;</code></td>
+                                        <td><code>&#91;for \$i = 1; \$i &lt;= 5; \$i++&#93; ... &#91;forend&#93;</code> (or <code>&#91;/for&#93;</code>)</td>
                                         <td>Standard numeric for loop.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[while condition] ... [whileend]</code></td>
-                                        <td><code>[while \$hasMore] ... [whileend]</code> (or <code>[/while]</code>)</td>
+                                        <td><code>&#91;while condition&#93; ... &#91;whileend&#93;</code></td>
+                                        <td><code>&#91;while \$hasMore&#93; ... &#91;whileend&#93;</code> (or <code>&#91;/while&#93;</code>)</td>
                                         <td>Standard while loop.</td>
                                     </tr>
                                     <tr>
-                                        <td><code>[end]</code></td>
-                                        <td><code>[if \$x] ... [end]</code>, <code>[each \$p] ... [end]</code></td>
+                                        <td><code>&#91;end&#93;</code></td>
+                                        <td><code>&#91;if \$x&#93; ... &#91;end&#93;</code>, <code>&#91;each \$p&#93; ... &#91;end&#93;</code></td>
                                         <td>Universal fallback closer supporting all block types.</td>
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
-                                        <td colspan="3">6. Template Helper Functions (Inside <code>@{{ }}</code>)</td>
+                                        <td colspan="3">6. Template Helper Functions (Inside <code>@[[ ]]</code> or <code>@{{ }}</code>)</td>
                                     </tr>
                                     <tr>
-                                        <td><code>assets('/path')</code></td>
-                                        <td><code>@{{assets('/css/style.css')}}</code></td>
+                                        <td><code>asset('/path')</code></td>
+                                        <td><code>@[[ asset('/css/style.css') ]]</code></td>
                                         <td>Generates absolute URL directly to assets folder (subfolder safe).</td>
                                     </tr>
                                     <tr>
                                         <td><code>route('name', \$params)</code></td>
-                                        <td><code>@{{route('posts.show', ['slug' =&gt; 'hi'])}}</code></td>
+                                        <td><code>@[[ route('posts.show', ['slug' =&gt; 'hi']) ]]</code></td>
                                         <td>Generates URL for a named route from <code>Routes/web.php</code>.</td>
                                     </tr>
                                     <tr>
                                         <td><code>url('/path')</code></td>
-                                        <td><code>@{{url('/contact')}}</code></td>
+                                        <td><code>@[[ url('/contact') ]]</code></td>
                                         <td>Generates application URL with subfolder auto-detection.</td>
                                     </tr>
                                     <tr>
                                         <td><code>config('key', 'default')</code></td>
-                                        <td><code>@{{config('app.name')}}</code></td>
+                                        <td><code>@[[ config('app.name') ]]</code></td>
                                         <td>Retrieves application configuration values.</td>
                                     </tr>
                                     <tr>
                                         <td><code>old('field', 'default')</code></td>
-                                        <td><code>@{{old('email')}}</code></td>
+                                        <td><code>@[[ old('email') ]]</code></td>
                                         <td>Retrieves previous form input after a validation error.</td>
                                     </tr>
                                     <tr>
                                         <td><code>is_home()</code></td>
-                                        <td><code>[unless is_home()] ... [end]</code></td>
+                                        <td><code>&#91;unless is_home()&#93; ... &#91;end&#93;</code></td>
                                         <td>Returns <code>true</code> on homepage (<code>/</code> or named route <code>'home'</code>), <code>false</code> otherwise.</td>
                                     </tr>
                                     <tr>
                                         <td><code>is_route('name')</code></td>
-                                        <td><code>[if is_route('contact')] ... [end]</code></td>
+                                        <td><code>&#91;if is_route('contact')&#93; ... &#91;end&#93;</code></td>
                                         <td>Checks if current route name or URI matches. Supports wildcards (<code>'blog.*'</code>).</td>
                                     </tr>
                                     <tr>
                                         <td><code>request_uri()</code></td>
-                                        <td><code>[if request_uri() !== '/'] ... [end]</code></td>
+                                        <td><code>&#91;if request_uri() !== '/'&#93; ... &#91;end&#93;</code></td>
                                         <td>Returns the current relative request path (without query parameters).</td>
                                     </tr>
                                     <tr>
                                         <td><code>csrf_field()</code></td>
-                                        <td><code>@{{csrf_field()}}</code></td>
+                                        <td><code>@[[ csrf_field() ]]</code> (or <code>&#91;csrf&#93;</code>)</td>
                                         <td>HTML hidden input containing CSRF security token.</td>
                                     </tr>
                                     <tr>
                                         <td><code>honeypot_field()</code></td>
-                                        <td><code>@{{honeypot_field()}}</code></td>
+                                        <td><code>@[[ honeypot_field() ]]</code> (or <code>&#91;honeypot&#93;</code>)</td>
                                         <td>HTML hidden input for anti-bot spam prevention.</td>
                                     </tr>
                                 </tbody>
@@ -1385,13 +1385,13 @@ Router::post('/contact', 'ContactController@sendMail')->name('contact.send');
 Router::get('/portfolio/{slug}', 'PortfolioController@show')->name('portfolio.show');</code></pre>
 
                         <h3>Linking to Named Routes in Templates:</h3>
-                        <p>In any <code>.srin.php</code> template, generate links easily using <code>@{{route('name')}}</code>:</p>
-                        <pre><code>&lt;a href="@{{route('home')}}"&gt;Home&lt;/a&gt;
-&lt;a href="@{{route('about')}}"&gt;About Us&lt;/a&gt;
-&lt;a href="@{{route('contact')}}"&gt;Contact&lt;/a&gt;
+                        <p>In any <code>.srin.php</code> template, generate links easily using <code>@[[ route('name') ]]</code>:</p>
+                        <pre><code>&lt;a href="@[[ route('home') ]]"&gt;Home&lt;/a&gt;
+&lt;a href="@[[ route('about') ]]"&gt;About Us&lt;/a&gt;
+&lt;a href="@[[ route('contact') ]]"&gt;Contact&lt;/a&gt;
 
 &lt;!-- With Route Parameters: --&gt;
-&lt;a href="@{{route('portfolio.show', ['slug' => 'branding-project'])}}"&gt;View Project&lt;/a&gt;</code></pre>
+&lt;a href="@[[ route('portfolio.show', ['slug' => 'branding-project']) ]]"&gt;View Project&lt;/a&gt;</code></pre>
 
                         <h3>Using in Controllers or PHP:</h3>
                         <pre><code>// In Controllers:
@@ -1519,15 +1519,15 @@ if (!isAuthorized()) {
                         <ul class="feature-bullets">
                             <li>
                                 <strong>1. XSS (Cross-Site Scripting) Defense:</strong>
-                                All <code>&#123;&#123; $expr &#125;&#125;</code> statements are automatically compiled with <code>htmlspecialchars(..., ENT_QUOTES, 'UTF-8')</code>. Any injected <code>&lt;script&gt;</code> tags or HTML attributes are completely neutralized.
+                                All <code>&#91;&#91; $expr &#93;&#93;</code> statements are automatically compiled with <code>htmlspecialchars(..., ENT_QUOTES, 'UTF-8')</code>. Any injected <code>&lt;script&gt;</code> tags or HTML attributes are completely neutralized.
                             </li>
                             <li>
                                 <strong>2. CSRF (Cross-Site Request Forgery) Defense:</strong>
-                                Forms are secured using cryptographically secure tokens via <code>@@csrf</code> (or <code>&#123;&#123; csrf_field() &#125;&#125;</code>). Validated using timing-safe <code>hash_equals()</code>; failed tokens cleanly trigger HTTP <code>419 Page Expired</code>.
+                                Forms are secured using cryptographically secure tokens via <code>&#91;csrf&#93;</code> (or <code>&#91;&#91; csrf_field() &#93;&#93;</code>). Validated using timing-safe <code>hash_equals()</code>; failed tokens cleanly trigger HTTP <code>419 Page Expired</code>.
                             </li>
                             <li>
                                 <strong>3. Automated Bot &amp; Spam Trap (Honeypot):</strong>
-                                Add <code>@@honeypot</code> to forms. An invisible CSS-hidden input traps automated spam bots while real humans never see it. Verify with <code>\$this-&gt;validateHoneypot()</code>.
+                                Add <code>&#91;honeypot&#93;</code> to forms. An invisible CSS-hidden input traps automated spam bots while real humans never see it. Verify with <code>\$this-&gt;validateHoneypot()</code>.
                             </li>
                             <li>
                                 <strong>4. Rate Limiting &amp; Brute-Force / DoS Protection:</strong>
@@ -1612,7 +1612,7 @@ public function sendMail()
                                     </tr>
                                     <tr>
                                         <td><code>route('name', \$params)</code></td>
-                                        <td>Generate URL for a named route (or use <code>@{{route('name')}}</code>).</td>
+                                        <td>Generate URL for a named route (or use <code>@[[ route('name') ]]</code>).</td>
                                     </tr>
                                     <tr>
                                         <td><code>url('/path')</code></td>

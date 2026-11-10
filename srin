@@ -372,16 +372,16 @@ function handleMakePage(array $args, string $baseDir): void
     $title = ucwords(str_replace(['-', '_', '/'], ' ', $cleanName));
 
     $template = <<<HTML
-@Connect('layouts/main')
-@title('{$title}')
+[connect 'layouts/main']
+[title '{$title}']
 
-{{-- Optional: Connect to named layout slots (e.g. header, footer)
-@contentConnect('header')
+[-- Optional: Connect to named layout slots (e.g. header, footer)
+[block 'header']
     <header class="page-header">
         <h1>{$title}</h1>
     </header>
-@endContentConnect
---}}
+[blockend]
+--]
 
 <div class="content-box">
     <h1>{$title}</h1>
@@ -390,13 +390,13 @@ function handleMakePage(array $args, string $baseDir): void
     <p>Add your static HTML or PHP content here. It automatically slots into <code>Pages/layouts/main.srin.php</code>.</p>
 </div>
 
-{{-- Optional: Connect to footer or scripts slot
-@contentConnect('footer')
+[-- Optional: Connect to footer or scripts slot
+[block 'footer']
     <footer class="page-footer">
-        <p>&copy; {{ date('Y') }} {$title}.</p>
+        <p>&copy; [[ date('Y') ]] {$title}.</p>
     </footer>
-@endContentConnect
---}}
+[blockend]
+--]
 HTML;
 
     file_put_contents($pagePath, $template);
@@ -414,25 +414,25 @@ HTML;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars(\$title ?? config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?></title>
+    <title>[[ \$title ?? config('name', 'Srin Engine') ]]</title>
     <!-- Default Srin Favicon -->
-    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
-    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
-    <!-- Connect your CSS directly using {{assets('/css/style.css')}} -->
-    <link rel="stylesheet" href="{{assets('/css/style.css')}}">
-    @content('head')
+    <link rel="icon" type="image/svg+xml" href="[[ asset('/favicon.svg') ]]">
+    <link rel="alternate icon" href="[[ asset('/favicon.ico') ]]">
+    <!-- Connect your CSS directly using [[ asset('/css/style.css') ]] -->
+    <link rel="stylesheet" href="[[ asset('/css/style.css') ]]">
+    [slot 'head']
 </head>
 <body>
     <!-- 1. Header Slot with fallback navbar: -->
-    @content('header')
+    [slot 'header']
 
     <header class="site-header">
         <div class="container nav-container">
-            <a href="<?= url('/') ?>" class="brand-logo">
-                <span class="logo-accent">&lt;/&gt;</span> <?= htmlspecialchars(config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?>
+            <a href="[[ url('/') ]]" class="brand-logo">
+                <span class="logo-accent">&lt;/&gt;</span> [[ config('name', 'Srin Engine') ]]
             </a>
             <nav class="nav-links">
-                <a href="<?= url('/') ?>">Home</a>
+                <a href="[[ url('/') ]]">Home</a>
             </nav>
         </div>
     </header>
@@ -440,23 +440,23 @@ HTML;
     <!-- 2. Main Page Content: -->
     <main class="page-content">
         <div class="container">
-            @flash('success')
-            @flash('error')
-            @content
+            [flash 'success']
+            [flash 'error']
+            [slot]
         </div>
     </main>
 
     <!-- 3. Footer Slot: -->
-    @content('footer')
+    [slot 'footer']
 
     <footer class="site-footer">
         <div class="container footer-container">
-            <p>&copy; <?= date('Y') ?> <?= htmlspecialchars(config('name', 'Srin Engine'), ENT_QUOTES, 'UTF-8') ?>. Developed by <?= htmlspecialchars(config('developer', 'Arindam Makar'), ENT_QUOTES, 'UTF-8') ?>.</p>
+            <p>&copy; [[ date('Y') ]] [[ config('name', 'Srin Engine') ]]. Developed by [[ config('developer', 'Arindam Makar') ]].</p>
         </div>
     </footer>
-    <!-- Connect your JS directly using {{assets('/js/main.js')}} -->
-    <script src="{{assets('/js/main.js')}}"></script>
-    @content('scripts')
+    <!-- Connect your JS directly using [[ asset('/js/main.js') ]] -->
+    <script src="[[ asset('/js/main.js') ]]"></script>
+    [slot 'scripts']
 </body>
 </html>
 HTML;
@@ -499,17 +499,17 @@ function handleMakeLayout(array $args, string $baseDir): void
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= htmlspecialchars(\$title ?? '{$title}', ENT_QUOTES, 'UTF-8') ?></title>
+    <title>[[ \$title ?? '{$title}' ]]</title>
     <!-- Default Srin Favicon -->
-    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
-    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
-    <!-- Connect your CSS directly using {{assets('/css/style.css')}} -->
-    <link rel="stylesheet" href="{{assets('/css/style.css')}}">
-    @content('head')
+    <link rel="icon" type="image/svg+xml" href="[[ asset('/favicon.svg') ]]">
+    <link rel="alternate icon" href="[[ asset('/favicon.ico') ]]">
+    <!-- Connect your CSS directly using [[ asset('/css/style.css') ]] -->
+    <link rel="stylesheet" href="[[ asset('/css/style.css') ]]">
+    [slot 'head']
 </head>
 <body>
     <!-- 1. Header Slot with fallback: -->
-    @content('header')
+    [slot 'header']
 
     <header class="site-header">
         <div class="container">
@@ -520,18 +520,18 @@ function handleMakeLayout(array $args, string $baseDir): void
     <!-- 2. Main Content Slot: -->
     <main class="page-content">
         <div class="container">
-            @flash('success')
-            @flash('error')
-            @content
+            [flash 'success']
+            [flash 'error']
+            [slot]
         </div>
     </main>
 
     <!-- 3. Footer Slot: -->
-    @content('footer')
+    [slot 'footer']
 
-    <!-- Connect your JS directly using {{assets('/js/main.js')}} -->
-    <script src="{{assets('/js/main.js')}}"></script>
-    @content('scripts')
+    <!-- Connect your JS directly using [[ asset('/js/main.js') ]] -->
+    <script src="[[ asset('/js/main.js') ]]"></script>
+    [slot 'scripts']
 </body>
 </html>
 HTML;
@@ -545,7 +545,7 @@ HTML;
 
     echo color("\n[✓] Layout created successfully!", 'green') . "\n";
     echo "  Location: " . color("Pages/layouts/{$cleanName}.srin.php", 'cyan') . "\n";
-    echo "  Usage in page: " . color("@Connect('layouts/{$cleanName}')\n\n", 'yellow');
+    echo "  Usage in page: " . color("[connect 'layouts/{$cleanName}']\n\n", 'yellow');
 }
 
 /**
@@ -589,7 +589,7 @@ function handleMakePartial(array $args, string $baseDir): void
     $title = ucwords(str_replace(['-', '_', '/'], ' ', basename($cleanName)));
 
     $template = <<<HTML
-{{-- Srin Partial: {$title} --}}
+[-- Srin Partial: {$title} --]
 <div class="partial-component">
     <!-- Reusable partial HTML or PHP component -->
 </div>
@@ -600,7 +600,7 @@ HTML;
     $relPath = str_replace($baseDir . '/', '', $partialPath);
     echo color("\n[✓] Partial created successfully!", 'green') . "\n";
     echo "  Location: " . color($relPath, 'cyan') . "\n";
-    echo "  Usage in any page: " . color("@include('{$includeDot}')\n\n", 'yellow');
+    echo "  Usage in any page: " . color("[include '{$includeDot}']\n\n", 'yellow');
 }
 
 /**
@@ -653,7 +653,7 @@ function handleMakeError(array $args, string $baseDir): void
     }
 
     $template = <<<HTML
-@title('{$code} - {$statusText}')
+[title '{$code} - {$statusText}']
 
 <!DOCTYPE html>
 <html lang="en">
@@ -661,7 +661,7 @@ function handleMakeError(array $args, string $baseDir): void
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= \$title ?? '{$code} - {$statusText}' ?></title>
-    <!-- Connect assets directly with {{assets('/css/style.css')}} -->
+    <!-- Connect assets directly with [[ asset('/css/style.css') ]] -->
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {

@@ -1,6 +1,6 @@
 # SRIN Engine - Core PHP Static Website System
 
-**SRIN** is a lightweight, high-performance, and ultra-secure **Core PHP static website engine** architected and developed by **Arindam Makar** ([@deadxfire](https://github.com/deadxfire)). Designed for blazing-fast static websites paired with dynamic essentials: mail transfer via SMTP or logs, native `.env` environment configuration, Composer packages in a custom `Others/` vendor directory, strict `.srin.php` templates with `@Connect` layouts, named routing, direct asset linking, automated error handling, and the dedicated `php srin` CLI tool.
+**SRIN** is a lightweight, high-performance, and ultra-secure **Core PHP static website engine** architected and developed by **Arindam Makar** ([@deadxfire](https://github.com/deadxfire)). Designed for blazing-fast static websites paired with dynamic essentials: mail transfer via SMTP or logs, native `.env` environment configuration, Composer packages in a custom `Others/` vendor directory, strict `.srin.php` templates with `[layout]` master templates, named routing, direct asset linking, automated error handling, and the dedicated `php srin` CLI tool.
 
 Starts with a clean slate: no dummy controllers or unwanted bloat. The default page is **`Pages/welcome.srin.php`**, serving the interactive documentation and system verification.
 
@@ -192,7 +192,7 @@ phpsystem/
 │   ├── Response.php        # HTTP response, redirects, and secure asset downloads
 │   ├── Router.php          # URL routing engine (GET, POST, named routes, closures)
 │   ├── Schema.php          # Schema builder facade (create, drop, dropIfExists)
-│   └── View.php            # Strict .srin.php template renderer with @Connect
+│   └── View.php            # Strict .srin.php template renderer with [layout] & [block]
 │
 ├── Pages/                  # Frontend templates & layouts (.srin.php only)
 │   ├── errors/             # Custom error pages (e.g. 404.srin.php, 500.srin.php)
@@ -221,15 +221,15 @@ phpsystem/
 
 ## 🔒 Enterprise-Grade Security & Anti-Hacking Defenses
 
-Like Laravel, Srin Engine enforces strict access boundaries and defense-in-depth protections to defeat common and advanced web attack vectors:
+Srin Engine enforces strict access boundaries and defense-in-depth protections to defeat common and advanced web attack vectors:
 
-### 1. XSS (Cross-Site Scripting) Defense on `{{ }}`
-All expressions evaluated inside `{{ $expression }}` are automatically sanitized using `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Any injected HTML or `<script>` tags are neutralized before reaching the browser. Raw unescaped output is strictly quarantined to `{!! $trustedHtml !!}`.
+### 1. XSS (Cross-Site Scripting) Defense on Output Expressions
+All dynamic expressions evaluated inside `[[ $expression ]]` or `{{ $expression }}` are automatically sanitized using `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Any injected HTML or `<script>` tags are neutralized before reaching the browser. Raw unescaped output is strictly quarantined to `[{ $trustedHtml }]`.
 
 ### 2. Bulletproof CSRF Protection for Forms
-Every form submission is protected using cryptographically random session tokens via `@csrf` or `{{ csrf_field() }}`. Verified using timing-attack-safe `hash_equals()`; expired tokens automatically render a custom HTTP 419 error page with safe token regeneration.
+Every form submission is protected using cryptographically random session tokens via `[csrf]` or `{{ csrf_field() }}`. Verified using timing-attack-safe `hash_equals()`; expired tokens automatically render a custom HTTP 419 error page with safe token regeneration.
 
-### 3. Invisible Anti-Bot Honeypot (`@honeypot`)
+### 3. Invisible Anti-Bot Honeypot (`[honeypot]`)
 Block automated spam bots on contact and inquiry forms without slow, intrusive CAPTCHAs. Real users never see the invisible field; bots fill it and get rejected immediately.
 
 ### 4. Rate Limiting & DoS / Brute-Force Throttling
@@ -255,49 +255,49 @@ return download('catalog.pdf', 'Company_Catalog.pdf');
 
 ---
 
-## 🎨 Running PHP in Templates: `{{ }}` Syntax & `@Connect`
+## 🎨 Running PHP in Templates: Native Srin Tags & Output Syntax
 
-Inside any `.srin.php` template, run PHP code and output data using `{{ }}`:
+Inside any `.srin.php` template, run PHP code and output data using native Srin tags and auto-escaped output:
 
 ```html
 <!-- Display Variables & Auto-Escaped Expressions (XSS-Safe) -->
-<h1>{{ $title }}</h1>
-<p>Today is {{ date('F j, Y') }}</p>
-<p>Copyright &copy; {{ date('Y') }} {{ config('name') }}</p>
+<h1>[[ $title ]]</h1>
+<p>Today is [[ date('F j, Y') ]]</p>
+<p>Copyright &copy; [[ date('Y') ]] [[ config('name') ]]</p>
 
 <!-- Form with Complete Anti-Hacking Protection -->
-<form action="{{route('contact.send')}}" method="POST">
-    @csrf       <!-- CSRF security token field -->
-    @honeypot   <!-- Invisible anti-bot spam trap -->
+<form action="[[ route('contact.send') ]]" method="POST">
+    [csrf]       <!-- CSRF security token field -->
+    [honeypot]   <!-- Invisible anti-bot spam trap -->
 
-    <input type="text" name="name" value="{{ old('name') }}" placeholder="Your Name" required>
-    <input type="email" name="email" value="{{ old('email') }}" placeholder="Your Email" required>
-    <textarea name="message" placeholder="Your Message">{{ old('message') }}</textarea>
+    <input type="text" name="name" value="[[ old('name') ]]" placeholder="Your Name" required>
+    <input type="email" name="email" value="[[ old('email') ]]" placeholder="Your Email" required>
+    <textarea name="message" placeholder="Your Message">[[ old('message') ]]</textarea>
     <button type="submit">Send Message</button>
 </form>
 
 <!-- Raw / Unescaped HTML (only when explicitly intended) -->
-<div>{!! $rawHtml !!}</div>
+<div>[{ $rawHtml }]</div>
 
 <!-- Secure Template Comments (completely omitted from browser source) -->
-{{-- This comment will never show up in browser inspect element --}}
+[-- This comment will never show up in browser inspect element --]
 
 <!-- Frontend JavaScript Escaping (Vue.js / Alpine.js / React) -->
-<span>@{{ vueData }}</span> <!-- Compiles literally to {{ vueData }} -->
+<span>@[[ vueData ]]</span> <!-- Compiles literally to [[ vueData ]] -->
 ```
 
-### Control Flow: Clean Srin Tags & Descriptive Closers (Zero Laravel Copycat):
+### Control Flow: Native Srin Tags & Descriptive Closers:
 ```html
 [if $user]
-    <h2>Welcome back, {{ $user->name }}!</h2>
+    <h2>Welcome back, [[ $user->name ]]!</h2>
 [else]
-    <a href="{{ route('auth.login') }}">Sign In</a>
+    <a href="[[ route('auth.login') ]]">Sign In</a>
 [ifend]
 
 [each $posts as $post]
     <article>
-        <h3>{{ $post->title }}</h3>
-        <p>{{ $post->excerpt }}</p>
+        <h3>[[ $post->title ]]</h3>
+        <p>[[ $post->excerpt ]]</p>
     </article>
 [empty]
     <p>No articles published yet.</p>
@@ -741,22 +741,20 @@ return $this->view('blog/index', ['articles' => $articles]);
 
 In your `.srin.php` template:
 ```html
-@foreach($articles as $article)
+[each $articles as $article]
     <article class="post">
-        <h2>{{ $article->title }}</h2>
-        <p>{{ $article->summary }}</p>
+        <h2>[[ $article->title ]]</h2>
+        <p>[[ $article->summary ]]</p>
     </article>
-@endforeach
+[eachend]
 
 <!-- Render responsive pagination controls (prev, numbered pills, next): -->
-@paginate($articles)
-<!-- Or: -->
-{!! $articles->links() !!}
+[paginate $articles]
 ```
 
 ---
 
-## 🎨 Asset Linking with `{{assets('/path')}}`
+## 🎨 Asset Linking with `[[ asset('/path') ]]`
 
 There are **no default CSS or JS files** cluttering your project. You create your own stylesheets, scripts, and media folders inside `assets/`.
 
@@ -764,28 +762,28 @@ Link assets directly inside `.srin.php` templates:
 
 ```html
 <!-- Stylesheet -->
-<link rel="stylesheet" href="{{assets('/css/style.css')}}">
+<link rel="stylesheet" href="[[ asset('/css/style.css') ]]">
 
 <!-- JavaScript -->
-<script src="{{assets('/js/main.js')}}"></script>
+<script src="[[ asset('/js/main.js') ]]"></script>
 
 <!-- Public Images (auto-resolves to assets/images/ without needing the folder location) -->
-<img src="{{assets('logo.png')}}" alt="Logo">
-<img src="{{assets('/images/portfolio/item-1.jpg')}}" alt="Project">
+<img src="[[ asset('logo.png') ]]" alt="Logo">
+<img src="[[ asset('/images/portfolio/item-1.jpg') ]]" alt="Project">
 
 <!-- Custom Asset Folders -->
-<link rel="preload" href="{{assets('/fonts/inter.woff2')}}" as="font">
-<img src="{{assets('/icons/check.svg')}}" alt="Check">
+<link rel="preload" href="[[ asset('/fonts/inter.woff2') ]]" as="font">
+<img src="[[ asset('/icons/check.svg') ]]" alt="Check">
 ```
 
-> **Direct Links & Subfolder Safe:** `{{assets('/path')}}` generates complete absolute URLs (e.g. `http://localhost:8000/assets/...`), auto-maps image filenames directly to `assets/images/`, and automatically detects whether your site is on a root domain (`https://mysite.com`) or inside a server subfolder (`https://mysite.com/subfolder/`).
+> **Direct Links & Subfolder Safe:** `[[ asset('/path') ]]` generates complete absolute URLs (e.g. `http://localhost:8000/assets/...`), auto-maps image filenames directly to `assets/images/`, and automatically detects whether your site is on a root domain (`https://mysite.com`) or inside a server subfolder (`https://mysite.com/subfolder/`).
 
 ---
 
 ## 🎨 Strict Templates, Master Layouts & Partials
 
 ### 1. Master Layout with Named Slots (`Pages/layouts/main.srin.php`):
-Define your layout shell and place named content slots using `@content('slot_name')`, with `@content` for the primary body:
+Define your layout shell and place named content slots using `[slot 'slot_name']`, with `[slot]` for the primary body:
 
 ```html
 <!DOCTYPE html>
@@ -793,76 +791,76 @@ Define your layout shell and place named content slots using `@content('slot_nam
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= $title ?? config('name') ?></title>
-    <link rel="stylesheet" href="{{assets('/css/style.css')}}">
-    @content('head') <!-- Optional page-specific meta or CSS -->
+    <title>[[ $title ?? config('name') ]]</title>
+    <link rel="stylesheet" href="[[ asset('/css/style.css') ]]">
+    [slot 'head'] <!-- Optional page-specific meta or CSS -->
 </head>
 <body>
     <!-- 1. Header Slot with fallback navbar partial -->
-    @content('header', view('partials.navbar'))
+    [slot 'header', view('partials.navbar')]
 
     <!-- 2. Main Page Content Slot -->
     <main class="container">
-        @flash('success')
-        @flash('error')
-        @content
+        [flash 'success']
+        [flash 'error']
+        [slot]
     </main>
 
     <!-- 3. Footer Slot -->
-    @content('footer')
+    [slot 'footer']
 
     <!-- 4. Scripts Slot -->
-    <script src="{{assets('/js/main.js')}}"></script>
-    @content('scripts')
+    <script src="[[ asset('/js/main.js') ]]"></script>
+    [slot 'scripts']
 </body>
 </html>
 ```
 
-### 2. Child Webpage with `@contentConnect` (`Pages/portfolio.srin.php`):
-Connect to the layout with `@Connect('layouts/main')`, feed custom sections directly into layout slots using `@contentConnect('slot_name') ... @endContentConnect`, and include partial components directly on the page:
+### 2. Child Webpage with `[connect]` (`Pages/portfolio.srin.php`):
+Connect to the layout with `[connect 'layouts/main']`, feed custom sections directly into layout slots using `[block 'slot_name'] ... [blockend]`, and include partial components directly on the page:
 
 ```html
-@Connect('layouts/main')
-@title('My Portfolio')
+[connect 'layouts/main']
+[title 'My Portfolio']
 
 <!-- Connect Custom Header Section -->
-@contentConnect('header')
+[block 'header']
 <header class="portfolio-header">
-    @include('partials.navbar') <!-- Dot-notation partial include -->
+    [include 'partials.navbar'] <!-- Dot-notation partial include -->
     <h1>Featured Creative Portfolio</h1>
 </header>
-@endContentConnect
+[blockend]
 
-<!-- Primary Content (Automatically flows into @content) -->
+<!-- Primary Content (Automatically flows into [slot]) -->
 <section class="portfolio-grid">
     <h2>Client Showcase</h2>
     <p>Rendered securely through Srin Engine.</p>
 
     <!-- Direct Partial Component with Custom Data -->
-    @include('components.card', [
+    [include 'components.card', [
         'title' => 'E-Commerce Platform',
         'badge' => 'Production',
-        'image' => assets('/images/portfolio/proj-1.jpg')
-    ])
+        'image' => asset('/images/portfolio/proj-1.jpg')
+    ]]
 </section>
 
 <!-- Connect Custom Footer Section -->
-@contentConnect('footer')
+[block 'footer']
 <footer class="portfolio-footer">
-    <p>&copy; {{ date('Y') }} Custom Portfolio Footer.</p>
+    <p>&copy; [[ date('Y') ]] Custom Portfolio Footer.</p>
 </footer>
-@endContentConnect
+[blockend]
 ```
 
-### 3. Including Reusable Partials: `@include('path.file')`
+### 3. Including Reusable Partials: `[include 'path.file']`
 Include reusable template chunks directly onto any webpage using clean dot-notation or slash paths. Inherits all current scope variables and accepts custom parameters:
 
 ```html
 <!-- Webpage Partials (Resolves to Pages/partials/navbar.srin.php) -->
-@include('partials.navbar')
+[include 'partials.navbar']
 
 <!-- Includes with Custom Data -->
-@include('components.card', ['title' => 'Fast API', 'desc' => 'Lightweight PHP'])
+[include 'components.card', ['title' => 'Fast API', 'desc' => 'Lightweight PHP']]
 ```
 
 ### 4. Complete Srin Tags & Directives Reference (Cheat Sheet)
@@ -1062,7 +1060,7 @@ log_debug('Benchmark profile');
 
 ## 🛡️ Request Checkpoints (Linear Middleware Gates)
 
-Instead of the convoluted, nested closure pipeline used in traditional frameworks (Laravel's onion middleware), Srin Engine introduces **Checkpoints**—a clean, linear request verification gate architecture.
+Instead of convoluted, deeply nested closure pipelines (onion middleware), Srin Engine introduces **Checkpoints**—a clean, linear request verification gate architecture.
 
 ### 1. The Checkpoint Lifecycle
 Each checkpoint implements `enter(Request $request)` to validate incoming requests, and optionally `leave(Request $request)` to inspect the outgoing response:

@@ -148,7 +148,7 @@ class View
             $data['title'] = trim(strip_tags($sections['title']));
         }
 
-        // 4. Compile and evaluate remaining content (default @content)
+        // 4. Compile and evaluate remaining content (default [slot])
         $compiledPage = self::compileDirectives($rawContent);
         $body = self::evaluate($compiledPage, $data);
 
@@ -158,7 +158,7 @@ class View
         $sections['main']    = $sections['main'] ?? $body;
         $sections['body']    = $sections['body'] ?? $body;
 
-        // 5. If layout was specified via @Connect or $data['layout']
+        // 5. If layout was specified via [layout] or $data['layout']
         $layoutToUse = $layout ?? ($data['layout'] ?? null);
 
         if ($layoutToUse) {
@@ -211,7 +211,7 @@ class View
 
         $layoutRaw = file_get_contents($realLayoutFile);
 
-        // Compile layout directives (@include, {{ }}, @csrf, etc.)
+        // Compile layout directives ([include], [[ ]], [csrf], etc.)
         $compiledLayout = self::compileDirectives($layoutRaw);
 
         // 1. Replace named slots & blockincludes: [slot 'name', 'default'], [blockinclude 'name'], [slot 'name']
@@ -344,16 +344,28 @@ class View
         $i = 0;
 
         while ($i < $len) {
-            // 1. Escaped tags: @[[ ... ]], @[{ ... }], @{{ ... }}
-            if ($template[$i] === '@' && $i + 2 < $len) {
-                $next2 = $template[$i + 1] . $template[$i + 2];
+            // 1. Escaped tags: @[[ ... ]], @[{ ... }], @{{ ... }}, @@[[ ... ]], @@[{ ... }], @@{{ ... }}
+            $isDoubleAt = false;
+            $tagOffset = -1;
+            $escAt = '%%ESCAPED_AT_SYMBOL%%';
+            $escAtLen = 21;
+            if (str_starts_with(substr($template, $i), $escAt) && $i + $escAtLen + 1 < $len) {
+                $isDoubleAt = true;
+                $tagOffset = $i + $escAtLen;
+            } elseif ($template[$i] === '@' && $i + 2 < $len) {
+                $isDoubleAt = false;
+                $tagOffset = $i + 1;
+            }
+
+            if ($tagOffset !== -1 && $tagOffset + 1 < $len) {
+                $next2 = $template[$tagOffset] . $template[$tagOffset + 1];
                 if ($next2 === '[[' || $next2 === '[{' || $next2 === '{{') {
                     $closeType = match ($next2) {
                         '[[' => ']]',
                         '[{' => '}]',
                         '{{' => '}}',
                     };
-                    $j = $i + 3;
+                    $j = $tagOffset + 2;
                     $depth = 0;
                     $inSingle = false;
                     $inDouble = false;
@@ -389,7 +401,10 @@ class View
                                     if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
                                         $matched = true;
                                         $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
-                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $escapedContent = $isDoubleAt
+                                            ? '@' . substr($template, $tagOffset, ($j + 2) - $tagOffset)
+                                            : substr($template, $tagOffset, ($j + 2) - $tagOffset);
+                                        $escapedTokens[$token] = $escapedContent;
                                         $result .= $token;
                                         $i = $j + 2;
                                         break;
@@ -405,7 +420,10 @@ class View
                                     if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
                                         $matched = true;
                                         $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
-                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $escapedContent = $isDoubleAt
+                                            ? '@' . substr($template, $tagOffset, ($j + 2) - $tagOffset)
+                                            : substr($template, $tagOffset, ($j + 2) - $tagOffset);
+                                        $escapedTokens[$token] = $escapedContent;
                                         $result .= $token;
                                         $i = $j + 2;
                                         break;
@@ -421,7 +439,10 @@ class View
                                     if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === '}') {
                                         $matched = true;
                                         $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
-                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $escapedContent = $isDoubleAt
+                                            ? '@' . substr($template, $tagOffset, ($j + 2) - $tagOffset)
+                                            : substr($template, $tagOffset, ($j + 2) - $tagOffset);
+                                        $escapedTokens[$token] = $escapedContent;
                                         $result .= $token;
                                         $i = $j + 2;
                                         break;
@@ -584,17 +605,27 @@ class View
     }
 
     /**
-     * Compile lightweight template directives.
-     * Supports Srin Tags ([if], [each], [else], [empty], [end]), Svelte-style ({#if}, {#each}),
-     * and legacy Blade-style (@if, @foreach) for full backward compatibility.
-     * Enforces strict XSS escaping on all {{ $expression }} outputs.
+     * Compile native Srin template directives.
+     * Compiles native Srin Tags ([if], [each], [else], [empty], [end], [block], [include], [csrf], [honeypot], [paginate])
+     * and output tags ([[ $expr ]] auto-escaped, [{ $expr }] raw, {{ $expr }} auto-escaped).
+     * Enforces strict XSS escaping on dynamic outputs.
      */
     public static function compileDirectives(string $template): string
     {
-        // 0. Strict check: Disallow Laravel Blade syntax (only when used as actual directives, not plain text like "@for")
-        if (preg_match('/(?<![a-zA-Z0-9_@])@(if|elseif|foreach|for|while|unless|isset|empty)\s*\(/i', $template, $bladeMatch)
-            || preg_match('/(?<![a-zA-Z0-9_@])@(endif|endforeach|endfor|endwhile|endunless|endisset|endempty|csrf|honeypot)\b/i', $template, $bladeMatch)) {
-            throw new Exception("Srin Template Error: Blade directive '{$bladeMatch[0]}' is not supported in Srin Engine. Please use Srin Tags instead (e.g. [if ...], [each ...], [end], [layout '...'], [include '...']).");
+        // Protect @@ escapes so they are not treated as directives
+        $template = preg_replace('/@@/', '%%ESCAPED_AT_SYMBOL%%', $template);
+
+        // 0. Strict check: Disallow unsupported directives (only when used as actual directives, not plain text like "@for")
+        $directivesWithParens = 'if|elseif|foreach|for|while|unless|isset|empty|switch|case|include|extends|yield|section|push|stack|component|slot';
+        $standaloneDirectives = 'endif|endforeach|endfor|endwhile|endunless|endisset|endempty|endswitch|endsection|endpush|endcomponent|endslot|csrf|honeypot|method';
+
+        if (
+            preg_match('/^\s*@(' . $directivesWithParens . ')\s*\(/mi', $template, $unsupportedMatch)
+            || preg_match('/^\s*@(' . $standaloneDirectives . ')\b/mi', $template, $unsupportedMatch)
+            || preg_match('/(?<!\w)@(' . $directivesWithParens . ')\s*\(/i', $template, $unsupportedMatch)
+        ) {
+            $directive = trim($unsupportedMatch[0]);
+            throw new Exception("Srin Template Error: Unsupported syntax '{$directive}'. Srin Engine uses native Srin Tags: [if ...], [each ...], [end], [layout '...'], [include '...'], [csrf], [honeypot].");
         }
 
         // 1. Strip comments: [-- ... --]
@@ -778,6 +809,10 @@ class View
         // 7. Restore escaped tokens as literal
         if (!empty($escapedTokens)) {
             $template = strtr($template, $escapedTokens);
+        }
+
+        if (str_contains($template, '%%ESCAPED_AT_SYMBOL%%')) {
+            $template = str_replace('%%ESCAPED_AT_SYMBOL%%', '@', $template);
         }
 
         return $template;
