@@ -30,7 +30,7 @@ return [
     'github' => 'https://github.com/deadxfire',
 
     // Application Environment: 'development' or 'production'
-    'env' => env('APP_ENV', 'development'),
+    'env' => env('APP_ENV', 'production'),
 
     // Debug Mode: true displays verbose errors; false renders clean 500 pages (fail-closed for security)
     'debug' => (bool) env('APP_DEBUG', false),
