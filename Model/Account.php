@@ -29,7 +29,6 @@ class Account extends Model
         'email',
         'password',
         'avatar',
-        'is_active',
     ];
 
     /**
@@ -40,6 +39,7 @@ class Account extends Model
     protected array $guarded = [
         'id',
         'role',
+        'is_active',
     ];
 
     /**
