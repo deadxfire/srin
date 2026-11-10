@@ -491,10 +491,11 @@ if (!function_exists('flash_inputs')) {
             session_start();
         }
 
-        // Do not preserve sensitive data like passwords, tokens, or confirmations
+        // Do not preserve sensitive data like passwords, tokens, confirmations, or HTTP method spoofing
         unset(
             $inputs['_csrf'],
             $inputs['_token'],
+            $inputs['_method'],
             $inputs['password'],
             $inputs['password_confirmation'],
             $inputs['current_password'],

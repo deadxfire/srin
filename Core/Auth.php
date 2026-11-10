@@ -200,42 +200,70 @@ class Auth
      * Example with criteria array:
      *   Auth::attempt(['email' => $email, 'password' => $pass, 'is_active' => 1]);
      */
-    public static function attempt(string|array $credentials, ?string $password = null): bool
+    public static function attempt(mixed $credentials, mixed $password = null): bool
     {
+        if (!is_array($credentials) && !is_scalar($credentials)) {
+            return false;
+        }
+
+        if ($password !== null && !is_scalar($password)) {
+            return false;
+        }
+
         $modelClass = self::model();
         if (!class_exists($modelClass)) {
             return false;
         }
 
-        $query = method_exists($modelClass, 'query') ? $modelClass::query() : new QueryBuilder($modelClass::getTable(), $modelClass);
-
         $passwordCol = function_exists('config') ? (string) config('auth.password_column', 'password') : 'password';
         $plainPassword = $password;
 
+        $query = method_exists($modelClass, 'query') ? $modelClass::query() : new QueryBuilder($modelClass::getTable(), $modelClass);
+
         if (is_array($credentials)) {
+            foreach ($credentials as $col => $val) {
+                if (!is_string($col) || (!is_scalar($val) && $val !== null)) {
+                    return false;
+                }
+            }
+
             if (isset($credentials['password'])) {
+                if (!is_scalar($credentials['password'])) {
+                    return false;
+                }
                 $plainPassword = (string) $credentials['password'];
                 unset($credentials['password']);
             }
+
             foreach ($credentials as $col => $val) {
                 $query->where($col, $val);
             }
-        } else {
+        } elseif (is_scalar($credentials)) {
+            if ($password !== null && !is_scalar($password)) {
+                return false;
+            }
             $identifierCol = function_exists('config') ? (string) config('auth.identifier', 'email') : 'email';
-            $query->where($identifierCol, trim($credentials));
+            $query->where($identifierCol, trim((string) $credentials));
+        } else {
+            return false;
+        }
+
+        if ($plainPassword !== null && !is_scalar($plainPassword)) {
+            return false;
         }
 
         $user = $query->first();
 
         if (!$user || $plainPassword === null) {
-            // Timing equalization against user enumeration: perform dummy hash verification
-            self::verify($plainPassword ?? '', self::getDummyHash());
+            // Timing equalization against user enumeration: spend equivalent work (password_hash) before returning false
+            $dummyPwd = ($plainPassword !== null && is_scalar($plainPassword)) ? (string) $plainPassword : '__srin_auth_timing_equalization__';
+            self::hash($dummyPwd);
             return false;
         }
 
         $storedHash = (string) ($user->{$passwordCol} ?? '');
 
-        if (self::verify($plainPassword, $storedHash)) {
+        if (self::verify((string) $plainPassword, $storedHash)) {
             // Automatic zero-downtime password hash upgrade (e.g. from Bcrypt to Argon2id or when cost/pepper changes)
             $autoRehash = function_exists('config') ? (bool) config('auth.hash.auto_rehash', true) : true;
             if ($autoRehash) {
@@ -266,18 +294,13 @@ class Auth
 
     /**
      * Log the user out of the application.
-     * Regenerates session ID, invalidates CSRF token, and purges session data.
+     * Regenerates session ID, purges all session data, and rotates CSRF token.
      */
     public static function logout(): void
     {
         self::startSession();
 
-        $sessionKey = self::getSessionKey();
-        unset($_SESSION[$sessionKey]);
         self::$cachedUser = null;
-
-        // Rotate and invalidate CSRF token & clear session
-        Security::regenerateCsrfToken();
         $_SESSION = [];
 
         if (!headers_sent()) {

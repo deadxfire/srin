@@ -50,21 +50,24 @@ class Response
 
     /**
      * Redirect back to previous URL (HTTP_REFERER) or a fallback route.
-     * Prevents open-redirect attacks by validating against application host.
+     * Prevents open-redirect attacks by strictly validating that Referer matches the application host.
      */
     public static function back(int $statusCode = 302, string $fallback = '/'): void
     {
-        $referer = $_SERVER['HTTP_REFERER'] ?? '';
-        $target = $fallback;
+        $referer = trim((string) ($_SERVER['HTTP_REFERER'] ?? ''));
+        $target = (str_starts_with($fallback, '/') && !str_starts_with($fallback, '//')) ? $fallback : '/';
 
         if ($referer !== '' && filter_var($referer, FILTER_VALIDATE_URL)) {
-            $refHost = parse_url($referer, PHP_URL_HOST);
-            $currentHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+            $refScheme = strtolower((string) parse_url($referer, PHP_URL_SCHEME));
+            $refHost = strtolower((string) parse_url($referer, PHP_URL_HOST));
+
+            $currentHost = strtolower((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost'));
             if (str_contains($currentHost, ':')) {
                 $currentHost = explode(':', $currentHost)[0];
             }
-            // Only allow redirect to same host
-            if ($refHost === $currentHost) {
+
+            // Only allow redirect to same host via http or https
+            if (in_array($refScheme, ['http', 'https'], true) && $refHost !== '' && $refHost === $currentHost) {
                 $target = $referer;
             }
         } elseif (str_starts_with($referer, '/') && !str_starts_with($referer, '//')) {

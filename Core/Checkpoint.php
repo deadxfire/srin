@@ -11,8 +11,8 @@ use Exception;
  * An intuitive, linear alternative to traditional onion middleware.
  *
  * Instead of nested closure hell ($next($request)), a Checkpoint implements:
- *   - enter(): Return true or null to ALLOW passage.
- *              Return a redirect, Response, or false to HALT and respond.
+ *   - enter(): Return true to ALLOW passage (default deny: false, null, or void halts passage).
+ *              Return a redirect, Response, or false/null to HALT and deny.
  *   - leave(): Optional post-controller filter modifying output.
  * ============================================================================
  */
