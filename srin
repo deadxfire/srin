@@ -366,7 +366,7 @@ function handleMakePage(array $args, string $baseDir): void
 
     $pageDir = dirname($pagePath);
     if (!is_dir($pageDir)) {
-        @mkdir($pageDir, 0777, true);
+        @mkdir($pageDir, 0755, true);
     }
 
     $title = ucwords(str_replace(['-', '_', '/'], ' ', $cleanName));
@@ -406,7 +406,7 @@ HTML;
     if (!file_exists($mainLayoutPath)) {
         $layoutDir = dirname($mainLayoutPath);
         if (!is_dir($layoutDir)) {
-            @mkdir($layoutDir, 0777, true);
+            @mkdir($layoutDir, 0755, true);
         }
         $mainLayoutTemplate = <<<HTML
 <!DOCTYPE html>
@@ -538,7 +538,7 @@ HTML;
 
     $dir = dirname($layoutPath);
     if (!is_dir($dir)) {
-        @mkdir($dir, 0777, true);
+        @mkdir($dir, 0755, true);
     }
 
     file_put_contents($layoutPath, $template);
@@ -583,7 +583,7 @@ function handleMakePartial(array $args, string $baseDir): void
 
     $partialDir = dirname($partialPath);
     if (!is_dir($partialDir)) {
-        @mkdir($partialDir, 0777, true);
+        @mkdir($partialDir, 0755, true);
     }
 
     $title = ucwords(str_replace(['-', '_', '/'], ' ', basename($cleanName)));
@@ -950,7 +950,7 @@ function handleMakeModel(array $args, string $baseDir): void
     $cleanName = ucfirst(preg_replace('/[^a-zA-Z0-9_]/', '', $name));
     $modelDir = $baseDir . '/Model';
     if (!is_dir($modelDir)) {
-        @mkdir($modelDir, 0777, true);
+        @mkdir($modelDir, 0755, true);
     }
 
     $modelPath = $modelDir . "/{$cleanName}.php";
@@ -1038,7 +1038,7 @@ function handleMakeMigration(array $args, string $baseDir, ?string $targetTable 
 
     $migrationsDir = $baseDir . '/database/migrations';
     if (!is_dir($migrationsDir)) {
-        @mkdir($migrationsDir, 0777, true);
+        @mkdir($migrationsDir, 0755, true);
     }
 
     $timestamp = date('Y_m_d_His');
@@ -1235,7 +1235,7 @@ function handleMakeSeeder(array $args, string $baseDir): void
 
     $seedersDir = $baseDir . '/database/seeders';
     if (!is_dir($seedersDir)) {
-        @mkdir($seedersDir, 0777, true);
+        @mkdir($seedersDir, 0755, true);
     }
 
     $seederPath = $seedersDir . "/{$cleanName}.php";
@@ -1366,8 +1366,16 @@ function handleUpgrade(array $args, string $baseDir): void
         }
     }
 
-    // Strictly validate branch name to prevent directory traversal or URL injection
-    if (!preg_match('/^[a-zA-Z0-9_.\-]+$/', $branch)) {
+    // Strictly validate branch name with a strict ref regex and reject '..'
+    if (
+        $branch === ''
+        || str_contains($branch, '..')
+        || str_starts_with($branch, '.')
+        || str_ends_with($branch, '.')
+        || str_starts_with($branch, '/')
+        || str_ends_with($branch, '/')
+        || !preg_match('/^[a-zA-Z0-9_.\-]+(?:\/[a-zA-Z0-9_.\-]+)*$/', $branch)
+    ) {
         echo color("\n[X] Error: Invalid branch name '{$branch}'.\n\n", 'red');
         return;
     }
@@ -1447,7 +1455,7 @@ function handleUpgrade(array $args, string $baseDir): void
     }
 
     // Step 1: Download archive from GitHub
-    $tempZip = sys_get_temp_dir() . '/srin_upgrade_' . uniqid() . '.zip';
+    $tempZip = sys_get_temp_dir() . '/srin_upgrade_' . bin2hex(random_bytes(16)) . '.zip';
     $downloadUrl = "https://codeload.github.com/deadxfire/srin/zip/refs/heads/{$branch}";
     echo "[1/4] Downloading update package from GitHub...\n";
 
@@ -1470,8 +1478,8 @@ function handleUpgrade(array $args, string $baseDir): void
 
     // Step 2: Extract archive
     echo "[2/4] Extracting package...\n";
-    $tempExtractDir = sys_get_temp_dir() . '/srin_extract_' . uniqid();
-    @mkdir($tempExtractDir, 0777, true);
+    $tempExtractDir = sys_get_temp_dir() . '/srin_extract_' . bin2hex(random_bytes(16));
+    @mkdir($tempExtractDir, 0700, true);
 
     $zip = new ZipArchive();
     if ($zip->open($tempZip) !== true) {
@@ -1479,6 +1487,28 @@ function handleUpgrade(array $args, string $baseDir): void
         @unlink($tempZip);
         srinDeleteDirectory($tempExtractDir);
         return;
+    }
+
+    // Reject entries that are absolute, contain .. segments or drive letters before extraction
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $stat = $zip->statIndex($i);
+        if ($stat === false || !isset($stat['name'])) {
+            continue;
+        }
+        $entryName = $stat['name'];
+        $normalized = str_replace('\\', '/', $entryName);
+
+        if (
+            str_starts_with($normalized, '/')
+            || preg_match('/^[a-zA-Z]:/i', $normalized)
+            || preg_match('#(^|/)\.\.(/|$)#', $normalized)
+        ) {
+            echo color("\n[X] Security Error: Zip archive contains illegal entry '{$entryName}'. Upgrade aborted.\n\n", 'red');
+            $zip->close();
+            @unlink($tempZip);
+            srinDeleteDirectory($tempExtractDir);
+            return;
+        }
     }
 
     $zip->extractTo($tempExtractDir);
@@ -1565,7 +1595,7 @@ function handleUpgrade(array $args, string $baseDir): void
     // E. Overwrite Pages/welcome.srin.php (default showcase and documentation)
     if (file_exists($sourceDir . '/Pages/welcome.srin.php')) {
         if (!$isDryRun) {
-            @mkdir($baseDir . '/Pages', 0777, true);
+            @mkdir($baseDir . '/Pages', 0755, true);
             copy($sourceDir . '/Pages/welcome.srin.php', $baseDir . '/Pages/welcome.srin.php');
         }
         echo "  " . color("[DONE]", 'green') . " Upgraded Pages/welcome.srin.php\n";
@@ -1601,6 +1631,10 @@ function handleUpgrade(array $args, string $baseDir): void
  */
 function srinHttpGet(string $url): ?string
 {
+    if (!str_starts_with(strtolower($url), 'https://')) {
+        return null;
+    }
+
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
@@ -1608,6 +1642,12 @@ function srinHttpGet(string $url): ?string
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        if (defined('CURLOPT_REDIR_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
+            curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
+        }
+        if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        }
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1622,10 +1662,12 @@ function srinHttpGet(string $url): ?string
             'header' => "User-Agent: Srin-Engine-Updater/1.0\r\nAccept: application/vnd.github.v3+json\r\n",
             'timeout' => 15,
             'follow_location' => 1,
+            'max_redirects' => 5,
         ],
         'ssl' => [
             'verify_peer' => true,
             'verify_peer_name' => true,
+            'allow_self_signed' => false,
         ],
     ]);
 
@@ -1638,6 +1680,10 @@ function srinHttpGet(string $url): ?string
  */
 function srinDownloadFile(string $url, string $destination): bool
 {
+    if (!str_starts_with(strtolower($url), 'https://')) {
+        return false;
+    }
+
     $fp = @fopen($destination, 'w+');
     if (!$fp) {
         return false;
@@ -1650,6 +1696,12 @@ function srinDownloadFile(string $url, string $destination): bool
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        if (defined('CURLOPT_REDIR_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
+            curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
+        }
+        if (defined('CURLOPT_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
+            curl_setopt($ch, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        }
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         $success = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1663,10 +1715,12 @@ function srinDownloadFile(string $url, string $destination): bool
             'header' => "User-Agent: Srin-Engine-Updater/1.0\r\n",
             'timeout' => 60,
             'follow_location' => 1,
+            'max_redirects' => 5,
         ],
         'ssl' => [
             'verify_peer' => true,
             'verify_peer_name' => true,
+            'allow_self_signed' => false,
         ],
     ]);
 
@@ -1689,7 +1743,7 @@ function srinCopyDirectory(string $source, string $dest, array $exclude = [], bo
 {
     $copied = 0;
     if (!is_dir($dest) && !$dryRun) {
-        @mkdir($dest, 0777, true);
+        @mkdir($dest, 0755, true);
     }
 
     $iterator = new RecursiveIteratorIterator(
@@ -1711,13 +1765,13 @@ function srinCopyDirectory(string $source, string $dest, array $exclude = [], bo
 
         if ($item->isDir()) {
             if (!is_dir($target) && !$dryRun) {
-                @mkdir($target, 0777, true);
+                @mkdir($target, 0755, true);
             }
         } else {
             if (!$dryRun) {
                 $dir = dirname($target);
                 if (!is_dir($dir)) {
-                    @mkdir($dir, 0777, true);
+                    @mkdir($dir, 0755, true);
                 }
                 copy($item->getPathname(), $target);
             }
