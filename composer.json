@@ -52,11 +52,13 @@
     ],
     "scripts": {
         "srin": "php srin",
-        "serve": "php srin serve",
-        "routes": "php srin routes",
-        "upgrade": "php srin upgrade",
+        "dev": "php srin dev",
+        "serve": "php srin dev",
+        "links": "php srin links",
+        "routes": "php srin links",
+        "setup": "php srin init",
         "post-create-project-cmd": [
-            "@php -r \"echo PHP_EOL . '========================================================' . PHP_EOL . '              Srin Engine Installed!                    ' . PHP_EOL . '            Developed by Arindam Makar                  ' . PHP_EOL . '        GitHub: https://github.com/deadxfire            ' . PHP_EOL . '========================================================' . PHP_EOL . 'To start your local server, run:' . PHP_EOL . '  php srin serve' . PHP_EOL . PHP_EOL;\""
+            "@php srin init"
         ]
     }
 }

@@ -77,6 +77,8 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         'Core\\Database' => __DIR__ . '/../..' . '/Core/Database.php',
         'Core\\Engine' => __DIR__ . '/../..' . '/Core/Engine.php',
         'Core\\Igniter' => __DIR__ . '/../..' . '/Core/Igniter.php',
+        'Core\\Installer' => __DIR__ . '/../..' . '/Core/Installer.php',
+        'Core\\Link' => __DIR__ . '/../..' . '/Core/Link.php',
         'Core\\Log' => __DIR__ . '/../..' . '/Core/Log.php',
         'Core\\Mailer' => __DIR__ . '/../..' . '/Core/Mailer.php',
         'Core\\Migration' => __DIR__ . '/../..' . '/Core/Migration.php',

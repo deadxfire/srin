@@ -3,7 +3,7 @@
         'name' => 'deadxfire/srin',
         'pretty_version' => 'dev-main',
         'version' => 'dev-main',
-        'reference' => 'b2da119321b4444bc1ab1d97ca92950de5bfb0ca',
+        'reference' => '1d4cb580ab83d1ebab5fb60ded69006db04f006a',
         'type' => 'project',
         'install_path' => __DIR__ . '/../../',
         'aliases' => array(),
@@ -13,7 +13,7 @@
         'deadxfire/srin' => array(
             'pretty_version' => 'dev-main',
             'version' => 'dev-main',
-            'reference' => 'b2da119321b4444bc1ab1d97ca92950de5bfb0ca',
+            'reference' => '1d4cb580ab83d1ebab5fb60ded69006db04f006a',
             'type' => 'project',
             'install_path' => __DIR__ . '/../../',
             'aliases' => array(),

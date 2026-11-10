@@ -224,6 +224,14 @@ switch ($command) {
         handleKeyGenerate($arguments, $baseDir);
         break;
 
+    // Project initialization & setup (.env + APP_KEY + APP_NAME)
+    case 'init':
+    case 'setup':
+        require_once $baseDir . '/Others/autoload.php';
+        $force = in_array('--force', $arguments);
+        \Core\Installer::setup($baseDir, $force);
+        break;
+
     // Local dev server
     case 'dev':
     case 'serve':
@@ -2023,6 +2031,7 @@ function showHelp(): void
     echo "  " . color("seed [--class=Name]", 'green') . "              Run database seeders (default: DatabaseSeeder)\n\n";
 
     echo color("APPLICATION COMMANDS:\n", 'yellow');
+    echo "  " . color("init [--force]", 'green') . "                    Initialize project (.env, project name, APP_KEY)\n";
     echo "  " . color("links", 'green') . "                            List all registered route links from Routes/link.php\n";
     echo "  " . color("dev [--port=8000]", 'green') . "                Start local PHP development server\n";
     echo "  " . color("key [--force]", 'green') . "                    Generate application 256-bit encryption key (APP_KEY)\n";

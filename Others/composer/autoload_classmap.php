@@ -19,6 +19,8 @@ return array(
     'Core\\Database' => $baseDir . '/Core/Database.php',
     'Core\\Engine' => $baseDir . '/Core/Engine.php',
     'Core\\Igniter' => $baseDir . '/Core/Igniter.php',
+    'Core\\Installer' => $baseDir . '/Core/Installer.php',
+    'Core\\Link' => $baseDir . '/Core/Link.php',
     'Core\\Log' => $baseDir . '/Core/Log.php',
     'Core\\Mailer' => $baseDir . '/Core/Mailer.php',
     'Core\\Migration' => $baseDir . '/Core/Migration.php',
