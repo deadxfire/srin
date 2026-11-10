@@ -772,15 +772,29 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         if (method_exists($this, $key)) {
-            $ref = new \ReflectionMethod($this, $key);
-            // Strictly disallow executing methods defined on base Core\Model class (e.g. delete, save, etc.)
-            if ($ref->isPublic() && $ref->getDeclaringClass()->getName() !== self::class && $ref->getNumberOfRequiredParameters() === 0) {
-                $relation = $this->$key();
-                if ($relation instanceof Relation) {
-                    $results = $relation->getResults();
-                    $this->relations[$key] = $results;
-                    return $results;
+            try {
+                $ref = new \ReflectionMethod($this, $key);
+                $declaringClass = $ref->getDeclaringClass()->getName();
+
+                // Only call methods that are public, non-static, take zero required parameters,
+                // and are declared on a subclass (never on Core\Model)
+                if (
+                    $ref->isPublic() &&
+                    !$ref->isStatic() &&
+                    $ref->getNumberOfRequiredParameters() === 0 &&
+                    $declaringClass !== self::class &&
+                    is_subclass_of($declaringClass, self::class) &&
+                    !method_exists(self::class, $key)
+                ) {
+                    $relation = $this->$key();
+                    if ($relation instanceof Relation) {
+                        $results = $relation->getResults();
+                        $this->relations[$key] = $results;
+                        return $results;
+                    }
                 }
+            } catch (\ReflectionException) {
+                // If reflection fails, safely ignore
             }
         }
 
