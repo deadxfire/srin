@@ -242,7 +242,7 @@ class Router
             }
 
             foreach ($params as $key => $val) {
-                $encodedVal = urlencode((string) $val);
+                $encodedVal = rawurlencode((string) $val);
                 if (str_contains($path, '{' . $key . '}')) {
                     $path = str_replace('{' . $key . '}', $encodedVal, $path);
                 } else {

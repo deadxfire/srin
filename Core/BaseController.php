@@ -200,7 +200,7 @@ class BaseController
         $forbidden = [
             'php', 'php2', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8', 'phtml', 'pht', 'phps', 'phar',
             'inc', 'cgi', 'pl', 'py', 'rb', 'sh', 'bash', 'asp', 'aspx', 'jsp', 'exe', 'dll', 'bat', 'cmd',
-            'htaccess', 'htpasswd', 'ini', 'user', 'shtml', 'html', 'htm', 'xhtml', 'svg', 'js', 'mjs',
+            'htaccess', 'htpasswd', 'ini', 'user', 'shtml', 'html', 'htm', 'xhtml', 'js', 'mjs',
         ];
 
         // Check EVERY dot-separated part of the client name (e.g. "shell.php.jpg").
@@ -261,8 +261,11 @@ class BaseController
         if (!file_exists($guard)) {
             @file_put_contents($guard, "# Auto-generated: uploads must never execute\n"
                 . "<IfModule mod_php.c>\n    php_flag engine off\n</IfModule>\n"
+                . "<IfModule mod_php7.c>\n    php_flag engine off\n</IfModule>\n"
                 . "<FilesMatch \"(?i)\\.(php[0-9s]?|phtml|phar|pht|cgi|pl|py|sh)$\">\n"
-                . "    Require all denied\n</FilesMatch>\n"
+                . "    <IfModule mod_authz_core.c>\n        Require all denied\n    </IfModule>\n"
+                . "    <IfModule !mod_authz_core.c>\n        Order allow,deny\n        Deny from all\n    </IfModule>\n"
+                . "</FilesMatch>\n"
                 . "Options -ExecCGI -Indexes\n"
                 . "RemoveHandler .php .phtml .phar\n"
                 . "Header set X-Content-Type-Options \"nosniff\"\n");
@@ -507,7 +510,7 @@ class BaseController
                 // min:N
                 if (str_starts_with($rule, 'min:')) {
                     $min = (float) substr($rule, 4);
-                    $isNumeric = in_array('numeric', $ruleList, true) || is_numeric($value);
+                    $isNumeric = in_array('numeric', $ruleList, true);
                     if ($isNumeric) {
                         if ((float) $value < $min) {
                             $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " must be at least {$min}.";
@@ -525,7 +528,7 @@ class BaseController
                 // max:N
                 if (str_starts_with($rule, 'max:')) {
                     $max = (float) substr($rule, 4);
-                    $isNumeric = in_array('numeric', $ruleList, true) || is_numeric($value);
+                    $isNumeric = in_array('numeric', $ruleList, true);
                     if ($isNumeric) {
                         if ((float) $value > $max) {
                             $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " cannot exceed {$max}.";

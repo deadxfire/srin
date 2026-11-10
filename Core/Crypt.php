@@ -67,12 +67,13 @@ class Crypt
         // Support base64: prefix if generated via 'php srin key:generate'
         if (str_starts_with($rawKey, 'base64:')) {
             $decoded = base64_decode(substr($rawKey, 7), true);
-            if ($decoded !== false && strlen($decoded) >= 32) {
-                return substr($decoded, 0, 32);
+            if ($decoded === false || strlen($decoded) < 32) {
+                throw new Exception('Invalid base64 encryption key; key must decode to at least 32 bytes.');
             }
+            return substr($decoded, 0, 32);
         }
 
-        // Derive deterministic 32-byte binary key via SHA-256
+        // Derive deterministic 32-byte binary key via SHA-256 for passphrase keys only
         return hash('sha256', $rawKey, true);
     }
 
@@ -122,6 +123,8 @@ class Crypt
             return null;
         }
 
+        $derivedKey = self::getKey($key);
+
         $decoded = base64_decode(strtr($payload, '-_', '+/'), true);
         if ($decoded === false || strlen($decoded) < (self::IV_LENGTH + self::TAG_LENGTH)) {
             return null;
@@ -132,7 +135,6 @@ class Crypt
         $ciphertext = substr($decoded, self::IV_LENGTH + self::TAG_LENGTH);
 
         try {
-            $derivedKey = self::getKey($key);
             $plaintext = openssl_decrypt(
                 $ciphertext,
                 self::CIPHER,

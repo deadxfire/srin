@@ -203,7 +203,7 @@ class Response
         // Also support Pages/errors/{code}.php directly without eval()
         if (file_exists($errorFilePhp)) {
             (static function ($__file, $__data) {
-                extract($__data, EXTR_OVERWRITE);
+                extract($__data, EXTR_SKIP);
                 include $__file;
             })($errorFilePhp, $errorData);
             exit;
@@ -218,7 +218,7 @@ class Response
         // Also support Pages/{code}.php directly without eval()
         if (file_exists($directFilePhp)) {
             (static function ($__file, $__data) {
-                extract($__data, EXTR_OVERWRITE);
+                extract($__data, EXTR_SKIP);
                 include $__file;
             })($directFilePhp, $errorData);
             exit;

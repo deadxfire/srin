@@ -110,7 +110,7 @@ switch ($command) {
         break;
 
     case 'key:generate':
-        handleKeyGenerate($baseDir);
+        handleKeyGenerate($arguments, $baseDir);
         break;
 
     case 'serve':
@@ -1749,11 +1749,11 @@ function srinDeleteDirectory(string $dir): bool
 /**
  * Handle key:generate command.
  */
-function handleKeyGenerate(string $baseDir): void
+function handleKeyGenerate(array $args, string $baseDir): void
 {
     require_once $baseDir . '/Core/Crypt.php';
 
-    $key = \Core\Crypt::generateKey();
+    $force = in_array('--force', $args, true);
     $envFile = $baseDir . '/.env';
 
     if (!file_exists($envFile)) {
@@ -1766,16 +1766,25 @@ function handleKeyGenerate(string $baseDir): void
     }
 
     $content = file_get_contents($envFile);
+
+    // Preserve non-empty existing APP_KEY unless --force is passed
+    if (preg_match('/^APP_KEY=(.+)$/m', $content, $m) && trim($m[1]) !== '' && !$force) {
+        echo color("\n[!] Application key already exists. Use --force to regenerate and overwrite.\n\n", 'yellow');
+        return;
+    }
+
+    $key = \Core\Crypt::generateKey();
+
     if (preg_match('/^APP_KEY=.*$/m', $content)) {
-        $content = preg_replace('/^APP_KEY=.*$/m', "APP_KEY={$key}", $content);
+        $content = preg_replace_callback('/^APP_KEY=.*$/m', fn() => "APP_KEY={$key}", $content);
     } else {
         $content .= "\nAPP_KEY={$key}\n";
     }
 
     file_put_contents($envFile, $content);
+    @chmod($envFile, 0600);
 
-    echo color("\n[✓] Application key set successfully!\n", 'green');
-    echo "  Key: " . color($key, 'yellow') . "\n\n";
+    echo color("\n[✓] Application key set successfully!\n\n", 'green');
 }
 
 /**

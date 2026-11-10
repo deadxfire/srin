@@ -175,7 +175,7 @@ class Migrator
             }
         } elseif ($driver === 'pgsql') {
             // PostgreSQL: query information_schema for user tables
-            $tables = Database::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+            $tables = Database::select("SELECT table_name FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'");
             if (!empty($tables)) {
                 foreach ($tables as $t) {
                     $tableName = reset($t);

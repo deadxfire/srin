@@ -161,10 +161,17 @@ class Security
         $cacheFile = $cacheDir . '/' . $rateKey . '.json';
         $now = time();
 
+        $fp = @fopen($cacheFile, 'c+');
+        if ($fp === false) {
+            return true;
+        }
+
+        flock($fp, LOCK_EX);
+
+        $contents = stream_get_contents($fp);
         $record = ['attempts' => 0, 'reset' => $now + $decaySeconds];
-        if (file_exists($cacheFile)) {
-            $content = @file_get_contents($cacheFile);
-            $data = json_decode((string) $content, true);
+        if (!empty($contents)) {
+            $data = json_decode($contents, true);
             if (is_array($data) && isset($data['attempts'], $data['reset'])) {
                 $record = $data;
             }
@@ -173,15 +180,21 @@ class Security
         // Reset if window expired
         if ($now > $record['reset']) {
             $record = ['attempts' => 1, 'reset' => $now + $decaySeconds];
-            @file_put_contents($cacheFile, json_encode($record), LOCK_EX);
-            return true;
+            $allowed = true;
+        } else {
+            // Increment attempt
+            $record['attempts']++;
+            $allowed = $record['attempts'] <= $maxAttempts;
         }
 
-        // Increment attempt
-        $record['attempts']++;
-        @file_put_contents($cacheFile, json_encode($record), LOCK_EX);
+        ftruncate($fp, 0);
+        rewind($fp);
+        fwrite($fp, json_encode($record));
+        fflush($fp);
+        flock($fp, LOCK_UN);
+        fclose($fp);
 
-        return $record['attempts'] <= $maxAttempts;
+        return $allowed;
     }
 
     /**

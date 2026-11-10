@@ -48,8 +48,8 @@ abstract class Checkpoint
     /**
      * Inspect the incoming request before the controller action executes.
      *
-     * @return mixed Return true or null to ALLOW passage.
-     *               Return a redirect, Response, or false to HALT immediately.
+     * @return mixed Return true to ALLOW passage.
+     *               Return a redirect, Response, or false/null to HALT and deny.
      */
     abstract public function enter(): mixed;
 
@@ -112,6 +112,7 @@ abstract class Checkpoint
 
             // If checkpoint returned false or null, halt execution (strict deny by default)
             if ($status === false || $status === null) {
+                Response::renderError(403, 'Forbidden');
                 return null;
             }
 

@@ -53,14 +53,31 @@ class QueryBuilder
             return $this->wrap($matches[1]) . ' AS ' . $this->wrapValue($matches[2]);
         }
 
-        // Handle safe aggregate functions: e.g. COUNT(*), SUM(col)
+        // Handle DISTINCT prefix: e.g. DISTINCT col
+        if (preg_match('/^DISTINCT\s+(.+)$/i', $value, $matches)) {
+            return 'DISTINCT ' . $this->wrap($matches[1]);
+        }
+
+        // Handle safe aggregate functions: e.g. COUNT(*), SUM(col), COUNT(DISTINCT col), COALESCE(col1, col2)
         if (preg_match('/^([a-zA-Z_]+)\((.*)\)$/', $value, $matches)) {
             $func = strtoupper($matches[1]);
             $allowedFuncs = ['COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'DISTINCT', 'COALESCE'];
             if (in_array($func, $allowedFuncs, true)) {
-                $arg = trim($matches[2]);
-                $wrappedArg = ($arg === '*') ? '*' : $this->wrap($arg);
-                return "{$func}({$wrappedArg})";
+                $argsStr = trim($matches[2]);
+                if ($argsStr === '*') {
+                    return "{$func}(*)";
+                }
+                $rawArgs = array_map('trim', explode(',', $argsStr));
+                $wrappedArgs = array_map(function($arg) {
+                    if ($arg === '*') {
+                        return '*';
+                    }
+                    if (preg_match('/^DISTINCT\s+(.+)$/i', $arg, $dm)) {
+                        return 'DISTINCT ' . $this->wrap($dm[1]);
+                    }
+                    return $this->wrap($arg);
+                }, $rawArgs);
+                return "{$func}(" . implode(', ', $wrappedArgs) . ")";
             }
         }
 
@@ -77,14 +94,12 @@ class QueryBuilder
             return '*';
         }
 
-        $clean = str_replace(['`', '"', "'", ';', '--', '/*'], '', $value);
-
-        // Disallow dangerous SQL injection characters in identifier
-        if (!preg_match('/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/', $clean)) {
-            $clean = preg_replace('/[^a-zA-Z0-9_.]/', '', $clean);
+        // Validate identifier before any lossy sanitization
+        if (!preg_match('/^[a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)*$/', $value)) {
+            throw new \InvalidArgumentException("Invalid SQL identifier: [{$value}]");
         }
 
-        $parts = explode('.', $clean);
+        $parts = explode('.', $value);
         $wrapped = array_map(fn($part) => '`' . trim($part) . '`', $parts);
         return implode('.', $wrapped);
     }
@@ -281,11 +296,12 @@ class QueryBuilder
         }
 
         $cols = is_array($columns) ? $columns : [$columns];
-        $pattern = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $keyword) . '%';
+        $escaped = str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $keyword);
+        $pattern = "%{$escaped}%";
 
         $clauses = [];
         foreach ($cols as $col) {
-            $clauses[] = $this->wrap($col) . " LIKE ? ESCAPE '\\\\'";
+            $clauses[] = $this->wrap($col) . " LIKE ? ESCAPE '!'";
             $this->bindings[] = $pattern;
         }
 

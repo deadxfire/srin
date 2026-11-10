@@ -28,6 +28,24 @@ class Auth
     protected static ?string $modelClass = null;
 
     /**
+     * Cached valid dummy hash for timing-equalized verification on missing users.
+     */
+    protected static ?string $dummyHash = null;
+
+    /**
+     * Get or create a valid dummy hash generated using active algorithm and options.
+     */
+    protected static function getDummyHash(): string
+    {
+        if (self::$dummyHash === null) {
+            $algo = self::getHashAlgorithm();
+            $options = self::getHashOptions($algo);
+            self::$dummyHash = password_hash('__srin_dummy_auth_timing_string__', $algo, $options);
+        }
+        return self::$dummyHash;
+    }
+
+    /**
      * Ensure session is active.
      */
     protected static function startSession(): void
@@ -211,7 +229,7 @@ class Auth
 
         if (!$user || $plainPassword === null) {
             // Timing equalization against user enumeration: perform dummy hash verification
-            self::verify($plainPassword ?? '', '$argon2id$v=19$m=65536,t=3,p=1$c29tZXNhbHQAAAAAAAAAAA$dummyhashplaceholderxxxxxxxxxxxxxxxxxxxxxxx');
+            self::verify($plainPassword ?? '', self::getDummyHash());
             return false;
         }
 
@@ -222,8 +240,7 @@ class Auth
             $autoRehash = function_exists('config') ? (bool) config('auth.hash.auto_rehash', true) : true;
             if ($autoRehash) {
                 $hasPepper = self::getPepper() !== '';
-                $isPeppered = password_verify(self::pepperPassword($plainPassword), $storedHash);
-                $needsRehash = self::needsRehash($storedHash) || ($hasPepper && !$isPeppered);
+                $needsRehash = self::needsRehash($storedHash) || ($hasPepper && !password_verify(self::pepperPassword($plainPassword), $storedHash));
 
                 if ($needsRehash) {
                     $newHash = self::hash($plainPassword);
@@ -286,6 +303,9 @@ class Auth
         $algo = function_exists('config') ? (string) config('auth.hash.algorithm', 'argon2id') : 'argon2id';
         $algo = strtolower(trim($algo));
 
+        if ($algo === 'default') {
+            return PASSWORD_DEFAULT;
+        }
         if (($algo === 'argon2id' || $algo === 'argon') && defined('PASSWORD_ARGON2ID')) {
             return PASSWORD_ARGON2ID;
         }

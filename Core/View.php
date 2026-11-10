@@ -223,7 +223,7 @@ class View
         $template = preg_replace('/\[\{\s*(.+?)\s*\}\]/s', '<?= $1 ?>', $template);
 
         // 4. Double brackets safe output: [[ $expression ]] (Srin standard, supports nested brackets like $a[$b[0]])
-        $safeOutputPattern = '/\[\[\s*((?:[^\[\]"\']+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|\[(?1)\])*)\s*\]\]/s';
+        $safeOutputPattern = '/\[\[\s*((?:[^\[\]"\']++|"[^"\\\\]*+(?:\\\\.[^"\\\\]*+)*+"|\'[^\'\\\\]*+(?:\\\\.[^\'\\\\]*+)*+\'|\[(?1)\])*)\s*\]\]/s';
         $template = preg_replace_callback($safeOutputPattern, function ($m) {
             $expr = trim($m[1]);
             if ($expr === '') {
@@ -419,7 +419,7 @@ class View
     public static function evaluate(string $__srin_code__, array $__srin_data__): string
     {
         return (static function () use ($__srin_code__, $__srin_data__) {
-            extract($__srin_data__, EXTR_OVERWRITE);
+            extract($__srin_data__, EXTR_SKIP);
             unset($__srin_data__);
 
             ob_start();
