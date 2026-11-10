@@ -38,7 +38,7 @@ return [
     // Application Encryption Key (used by Core\Crypt for AES-256-GCM encryption & optional peppers)
     'key' => env('APP_KEY', ''),
 
-    // Base Application URL
+    // Base Application URL (for reverse proxies or CDNs, configure APP_BASE_URL to canonical domain)
     'base_url' => env('APP_BASE_URL', '/'),
 
     // Default Application Timezone

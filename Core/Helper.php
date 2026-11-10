@@ -161,7 +161,12 @@ if (!function_exists('db')) {
 if (!function_exists('app_origin')) {
     /**
      * Get the base origin (scheme + host + optional subfolder) of the application.
-     * Automatically handles reverse proxies, HTTPS, and subdirectories.
+     * Automatically handles HTTPS and subdirectories.
+     *
+     * Reverse Proxies:
+     * X-Forwarded-Host is deliberately ignored to prevent host-header poisoning.
+     * When running behind a reverse proxy or load balancer, configure APP_BASE_URL
+     * in your .env (e.g. APP_BASE_URL="https://example.com") to set the canonical URL.
      */
     function app_origin(): string
     {
@@ -169,8 +174,11 @@ if (!function_exists('app_origin')) {
         if (function_exists('config')) {
             $configured = (string) (config('base_url') ?: config('app.base_url', ''));
         }
-        if ($configured === '' && function_exists('env')) {
-            $configured = (string) env('APP_BASE_URL', '');
+        if (($configured === '' || !preg_match('#^https?://#i', $configured)) && function_exists('env')) {
+            $envBase = (string) env('APP_BASE_URL', '');
+            if (preg_match('#^https?://#i', $envBase)) {
+                $configured = $envBase;
+            }
         }
 
         // Subdirectory detection from SCRIPT_NAME (e.g. /my-subfolder)
@@ -197,15 +205,18 @@ if (!function_exists('app_origin')) {
 
         $scheme = $isHttps ? 'https' : 'http';
 
-        // Host detection with strict header injection validation
-        $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost:8000';
-        if (str_contains($host, ',')) {
-            $parts = explode(',', $host);
-            $host = trim($parts[0]);
+        // Host detection: X-Forwarded-Host is deliberately ignored to defend against host header injection.
+        // For reverse proxies, configure APP_BASE_URL (e.g. https://example.com).
+        $rawHost = trim((string) ($_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? ''));
+        if (str_contains($rawHost, ',')) {
+            $parts = explode(',', $rawHost);
+            $rawHost = trim($parts[0]);
         }
 
-        // Defend against Host Header Injection / XSS
-        if (!preg_match('/^[a-zA-Z0-9.\-:]+$/', $host)) {
+        // Defend against Host Header Injection: accept only strict host[:port] pattern
+        if ($rawHost !== '' && preg_match('/^[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*(?::[0-9]{1,5})?$/', $rawHost)) {
+            $host = $rawHost;
+        } else {
             $host = 'localhost:8000';
         }
 

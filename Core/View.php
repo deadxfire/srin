@@ -230,7 +230,8 @@ class View
                 return '[[ ]]';
             }
             $expr = rtrim($expr, ';');
-            // Only raw HTML field generators are emitted without escaping
+            // Only raw HTML field generators are emitted without escaping;
+            // url(), route(), and asset() go through htmlspecialchars to prevent attribute breakout/XSS.
             if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
                 return "<?= {$expr} ?>";
             }
