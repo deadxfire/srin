@@ -257,11 +257,7 @@ class Mailer
             $replyTo = null;
         }
 
-        $logDir = dirname(__DIR__) . '/Others/logs';
-        if (!is_dir($logDir)) {
-            @mkdir($logDir, 0750, true);
-        }
-
+        $logDir = Log::getLogDir();
         $logFile = $logDir . '/mail.log';
         $timestamp = date('Y-m-d H:i:s');
         $divider = str_repeat('-', 50);

@@ -1,5 +1,5 @@
 # ==============================================================================
-# Rinswa Engine - Web Server Security & Routing Rules (.htaccess)
+# Srin Engine - Web Server Security & Routing Rules (.htaccess)
 # Developed by Arindam Makar
 # ==============================================================================
 
@@ -19,9 +19,8 @@ AddDefaultCharset UTF-8
     Header unset X-Powered-By
 </IfModule>
 
-# 3b. Never serve secrets, databases, logs, dependency manifests or dotfiles,
-#     even if the project root is (mis)configured as the web root.
-<FilesMatch "(?i)(^\.|\.(env|sqlite3?|db|log|lock|bak|sql|ini|md|dist|example|yml|yaml)$|^composer\.(json|lock)$|^srin$)">
+# 3b. Deny access to sensitive files: dotfiles, env/db/log/lock/sql files, composer.*, CLI tool
+<FilesMatch "(?i)(^\.|\.(env|sqlite[0-9]?|db|log|lock|sql|bak|ini|dist|example|yml|yaml)$|^composer\..+$|^srin$)">
     <IfModule mod_authz_core.c>
         Require all denied
     </IfModule>
@@ -31,12 +30,16 @@ AddDefaultCharset UTF-8
     </IfModule>
 </FilesMatch>
 
-# 3c. Uploaded/static directories must never execute server-side code.
-<IfModule mod_php.c>
-    <Directory "assets">
-        php_flag engine off
-    </Directory>
-</IfModule>
+# 3c. Block direct access to server-side scripts (allow only front controller index.php)
+<FilesMatch "(?i)^(?!index\.php$).*\.(php[0-9s]?|phtml|phar|pht|cgi|pl|py|sh|inc)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order allow,deny
+        Deny from all
+    </IfModule>
+</FilesMatch>
 
 # 4. Map Errors to index.php so 404 is always rendered
 ErrorDocument 403 /index.php
@@ -48,15 +51,15 @@ ErrorDocument 404 /index.php
     RewriteBase /
 
     # Block direct HTTP access to sensitive core directories, CLI tool, and config files
-    RewriteRule ^(\.env(?:\..*)?$|composer\.(json|lock)$|database/|Others/logs/|Config/|srin$) - [F,L,NC]
+    RewriteRule ^(\.env(?:\..*)?$|composer\..+$|database/|Others/logs/|Config/|Core/|Model/|Controller/|Pages/|Others/|srin$) - [F,L,NC]
 
     # Block server-side script types and dotfiles under assets/ (route them to the 404 handler)
-    RewriteCond %{REQUEST_URI} ^/assets/ [NC]
-    RewriteCond %{REQUEST_URI} (\.(php[0-9s]?|phtml|phar|pht|cgi|pl|py|sh|inc)(/|$)|/\.) [NC]
+    RewriteCond %{REQUEST_URI} ^/?assets/ [NC]
+    RewriteCond %{REQUEST_URI} (/\.|\.(php[0-9s]?|phtml|phar|pht|cgi|pl|py|sh|inc|bash|exe)(/|$)) [NC]
     RewriteRule ^ index.php [L,QSA]
 
     # Allow direct HTTP access ONLY for existing static/downloadable files inside assets/
-    RewriteCond %{REQUEST_URI} ^/assets/ [NC]
+    RewriteCond %{REQUEST_URI} ^/?assets/ [NC]
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 

@@ -82,10 +82,14 @@ class Database
                 @mkdir($dir, 0750, true);
             }
 
-            // Ensure database directory has a protecting .htaccess
+            // Ensure database directory has a protecting .htaccess and index.html
             $ht = $dir . DIRECTORY_SEPARATOR . '.htaccess';
             if (!file_exists($ht)) {
-                @file_put_contents($ht, "Order Deny,Allow\nDeny from all\n");
+                @file_put_contents($ht, "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n");
+            }
+            $index = $dir . DIRECTORY_SEPARATOR . 'index.html';
+            if (!file_exists($index)) {
+                @file_put_contents($index, "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body></body></html>\n");
             }
 
             // Create empty file if missing

@@ -28,7 +28,7 @@ class Migrator
     public function ensureTableExists(): void
     {
         if (!is_dir($this->migrationsPath)) {
-            @mkdir($this->migrationsPath, 0777, true);
+            @mkdir($this->migrationsPath, 0755, true);
         }
 
         if (!Schema::hasTable($this->table)) {

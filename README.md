@@ -1265,6 +1265,86 @@ Autoloading is handled automatically in `Others/autoload.php` and loaded in `ind
 
 ---
 
+## 🌐 Production Web Server Configuration (Nginx & Apache)
+
+When deploying Srin Engine in production, never expose project internals (`.env`, `database/`, `Others/logs/`, `Config/`, `composer.json`, `composer.lock`) to the public web.
+
+### 🔒 Document Root Recommendation
+For highest security, production web servers should point their document root to a dedicated public directory (or enforce strict URL whitelisting), ensuring only `index.php` and static files in `assets/` are reachable by clients.
+
+### 🚀 Nginx Configuration Example
+On Nginx, configure your server block to deny hidden files, configuration files, database files, and internal directories, routing only static assets and `index.php`:
+
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    root /var/www/srin;
+
+    index index.php;
+    charset utf-8;
+
+    # 1. Deny access to hidden/dot files (.env, .git, etc.)
+    location ~ /\.(?!well-known).* {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # 2. Deny access to secrets, database files, logs, and metadata
+    location ~* \.(env|sqlite[0-9]?|db|log|lock|sql|bak|ini|dist|example|ya?ml)$ {
+        deny all;
+    }
+
+    # 3. Deny direct access to framework internals and composer manifests
+    location ~* ^/(composer\..*|srin$|database/|Others/logs/|Config/|Core/|Model/|Controller/|Pages/|Others/) {
+        deny all;
+    }
+
+    # 4. Serve static assets directly from /assets/ (block scripts and dotfiles)
+    location /assets/ {
+        # Never execute script types inside assets/
+        location ~* \.(php[0-9s]?|phtml|phar|cgi|pl|py|sh|inc|exe)$ {
+            deny all;
+        }
+
+        # Block dotfiles inside assets/
+        location ~* /\..* {
+            deny all;
+        }
+
+        try_files $uri =404;
+        access_log off;
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # 5. Route all other requests through index.php
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    # 6. Execute PHP via FastCGI ONLY for index.php
+    location = /index.php {
+        include fastcgi_params;
+        fastcgi_pass unix:/var/run/php/php8.2-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_hide_header X-Powered-By;
+    }
+
+    # Deny direct execution of all other PHP files
+    location ~ \.php$ {
+        deny all;
+    }
+}
+```
+
+### 🛡️ Apache Configuration
+For Apache, `.htaccess` in the project root is pre-configured with `FilesMatch` and `mod_rewrite` rules to automatically deny dotfiles, database files (`.sqlite`), log files (`.log`), `composer.*`, and any server-side scripts under `assets/`, while routing all page requests to `index.php`.
+
+---
+
 ## 🔄 One-Command System Upgrade (`php srin upgrade`)
 
 Keep your Srin Engine up-to-date with a single command. Srin automatically checks the official GitHub repository for updates and safely upgrades the core framework code with overwrite:
