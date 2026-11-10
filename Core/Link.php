@@ -87,3 +87,4 @@ class Link
         Router::group($attributes, $callback);
     }
 }
+
