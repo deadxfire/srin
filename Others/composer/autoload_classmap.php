@@ -15,6 +15,7 @@ return array(
     'Core\\BaseController' => $baseDir . '/Core/BaseController.php',
     'Core\\Blueprint' => $baseDir . '/Core/Blueprint.php',
     'Core\\Checkpoint' => $baseDir . '/Core/Checkpoint.php',
+    'Core\\Command' => $baseDir . '/Core/Command.php',
     'Core\\Crypt' => $baseDir . '/Core/Crypt.php',
     'Core\\Database' => $baseDir . '/Core/Database.php',
     'Core\\Engine' => $baseDir . '/Core/Engine.php',

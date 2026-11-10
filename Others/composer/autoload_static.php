@@ -28,6 +28,7 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
             'Core\\' => 5,
             'Controller\\' => 11,
             'Config\\' => 7,
+            'Command\\' => 8,
             'Checkpoint\\' => 11,
         ),
     );
@@ -57,6 +58,10 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         array (
             0 => __DIR__ . '/../..' . '/Config',
         ),
+        'Command\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/Command',
+        ),
         'Checkpoint\\' =>
         array (
             0 => __DIR__ . '/../..' . '/Checkpoint',
@@ -73,6 +78,7 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         'Core\\BaseController' => __DIR__ . '/../..' . '/Core/BaseController.php',
         'Core\\Blueprint' => __DIR__ . '/../..' . '/Core/Blueprint.php',
         'Core\\Checkpoint' => __DIR__ . '/../..' . '/Core/Checkpoint.php',
+        'Core\\Command' => __DIR__ . '/../..' . '/Core/Command.php',
         'Core\\Crypt' => __DIR__ . '/../..' . '/Core/Crypt.php',
         'Core\\Database' => __DIR__ . '/../..' . '/Core/Database.php',
         'Core\\Engine' => __DIR__ . '/../..' . '/Core/Engine.php',

@@ -12,5 +12,6 @@ return array(
     'Core\\' => array($baseDir . '/Core'),
     'Controller\\' => array($baseDir . '/Controller'),
     'Config\\' => array($baseDir . '/Config'),
+    'Command\\' => array($baseDir . '/Command'),
     'Checkpoint\\' => array($baseDir . '/Checkpoint'),
 );

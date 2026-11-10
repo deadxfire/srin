@@ -350,7 +350,12 @@ srin add layout admin
 srin add error 404
 srin add error 500
 
-# 10. List all registered route links
+# 10. Create a custom CLI command & cPanel cron job
+srin add command SendWeeklyDigest # Scaffolds Command/SendWeeklyDigest.php
+srin send-weekly-digest           # Run custom command locally
+srin commands                     # List all registered custom commands
+
+# 11. List all registered route links
 srin links
 ```
 
@@ -1253,6 +1258,125 @@ class AccountController extends BaseController
 - **Error Code Verification:** `hasFile()` ensures `$_FILES['key']['error'] === UPLOAD_ERR_OK` and verifies `tmp_name` is non-empty, preventing empty-upload bypasses.
 - **Cryptographic Filename Hashing:** `storeFile()` generates `bin2hex(random_bytes(16))` filenames, completely defeating directory traversal (e.g. `../../etc/passwd`) and double-extension attacks (e.g. `malicious.php.jpg`).
 - **Strict Extension Whitelisting:** Passing permitted extensions (e.g. `['jpg', 'png', 'webp']`) strictly verifies the extension before moving the temporary file to permanent storage.
+
+---
+
+## ⚡ Custom CLI Commands & cPanel Cron Jobs
+
+Srin Engine allows developers to author custom command-line tools, scheduled background tasks, automated data processing scripts, and recurring maintenance routines. Every custom command extends `Core\Command` and inherits full access to the database (`Core\DB`), ActiveRecord models, configuration, mail transfer, and `.env` variables.
+
+### 1. Generating a Custom Command via CLI
+
+Scaffold a new command in one step using `srin add command <Name>`:
+
+```bash
+srin add command SendWeeklyDigest
+```
+
+Srin will automatically:
+1. Create the `Command/` directory if it does not yet exist.
+2. Generate `Command/SendWeeklyDigest.php` with the namespace `Command\SendWeeklyDigest`.
+3. Set the kebab-case CLI trigger signature: `send-weekly-digest`.
+4. Output complete, copy-paste cPanel cron job commands directly in your terminal.
+
+### 2. Anatomy of a Srin Command Class
+
+Every command extends `Core\Command` and provides built-in terminal coloring (`$this->info()`, `$this->success()`, `$this->warning()`, `$this->error()`), ASCII table rendering (`$this->table()`), and interactive terminal prompts (`$this->confirm()`, `$this->ask()`):
+
+```php
+<?php
+
+namespace Command;
+
+use Core\Command;
+use Core\DB;
+use Core\Mailer;
+
+class SendWeeklyDigest extends Command
+{
+    /**
+     * The command signature / CLI trigger name.
+     */
+    public string $name = 'send-weekly-digest';
+
+    /**
+     * Brief description shown in help and listings.
+     */
+    public string $description = 'Send weekly newsletter and digest to active subscribers';
+
+    /**
+     * Execute the command logic.
+     *
+     * @param array $args Command line arguments passed after the command name.
+     * @return int Exit code (0 for success, non-zero for error)
+     */
+    public function execute(array $args): int
+    {
+        $this->info("Running SendWeeklyDigest...");
+
+        // Query database via DB or Model
+        $subscribers = DB::table('users')->where('subscribed', 1)->get();
+        $this->line("Found " . count($subscribers) . " subscribers.");
+
+        // Terminal helper methods available:
+        // $this->info("text");          // Cyan informational message
+        // $this->success("text");       // Green success message
+        // $this->warning("text");       // Yellow warning message
+        // $this->error("text");         // Red error message
+        // $this->line("text");          // Plain text line
+        // $this->table($headers, $rows); // ASCII data table
+        // $this->confirm("Are you sure?", false); // Interactive confirmation [Y/n]
+        // $this->ask("Parameter:", "default"); // Interactive prompt
+
+        $this->success("SendWeeklyDigest completed successfully!");
+        return 0;
+    }
+}
+```
+
+### 3. Running Custom Commands Locally
+
+You can execute your custom commands via terminal using any of the following formats:
+
+```bash
+# Run by trigger signature
+srin send-weekly-digest
+
+# Or run by class name
+srin SendWeeklyDigest
+
+# Using the explicit run alias
+srin run send-weekly-digest
+
+# List all registered custom commands
+srin commands
+```
+
+### 4. Setting Up in cPanel Cron Jobs
+
+To automate your Srin command on a recurring schedule in cPanel shared or cloud hosting:
+
+1. Log into your **cPanel** dashboard.
+2. Scroll to the **Advanced** section and click **Cron Jobs**.
+3. Under **Add New Cron Job**, choose your interval from the **Common Settings** dropdown (e.g. *Once Per Day (0 0 * * *)*, *Every Hour*, or *Every 5 Minutes*).
+4. In the **Command** input box, paste either of the following commands:
+
+```bash
+# Option A: Absolute Path Command
+/usr/local/bin/php /home/YOUR_CPANEL_USER/public_html/srin send-weekly-digest >/dev/null 2>&1
+
+# Option B: Directory Navigation Command
+cd /home/YOUR_CPANEL_USER/public_html && /usr/local/bin/php srin send-weekly-digest >/dev/null 2>&1
+```
+
+> [!TIP]
+> **Why `>/dev/null 2>&1`?**
+> By default, cPanel dispatches an email to your account every time a cron job executes and produces terminal output. Appending `>/dev/null 2>&1` silences standard output and error, preventing inbox flooding.
+>
+> If you want to log cron job execution history to disk on your server, redirect output to a log file instead:
+> ```bash
+> /usr/local/bin/php /home/YOUR_CPANEL_USER/public_html/srin send-weekly-digest >> /home/YOUR_CPANEL_USER/public_html/Others/logs/cron.log 2>&1
+> ```
 
 ---
 

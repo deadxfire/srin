@@ -79,15 +79,34 @@ switch ($command) {
                 handleMakePartial($subArgs, $baseDir);
                 break;
 
+            case 'command':
+            case 'cron':
+            case 'job':
+            case 'task':
+                handleMakeCommand($subArgs, $baseDir);
+                break;
+
             case 'error':
                 handleMakeError($subArgs, $baseDir);
                 break;
 
             default:
-                echo color("\n[!] Please specify what to add: controller, model, migration, checkpoint, seeder, page, layout, partial, or error.\n", 'yellow');
-                echo "Example: srin add controller About\n\n";
+                echo color("\n[!] Please specify what to add: controller, model, migration, checkpoint, seeder, command, page, layout, partial, or error.\n", 'yellow');
+                echo "Example: srin add controller About\n";
+                echo "         srin add command SendWeeklyDigest\n\n";
                 break;
         }
+        break;
+
+    // Custom CLI commands & cPanel cron jobs
+    case 'command':
+    case 'make:command':
+        handleMakeCommand($arguments, $baseDir);
+        break;
+
+    case 'commands':
+    case 'command:list':
+        handleListCommands($baseDir);
         break;
 
     // Direct / legacy aliases for controllers
@@ -236,8 +255,16 @@ switch ($command) {
     case 'dev':
     case 'serve':
     case 'up':
-    case 'run':
         handleServe($arguments);
+        break;
+
+    case 'run':
+        $sub = $arguments[1] ?? null;
+        if ($sub && !str_starts_with($sub, '-') && !is_numeric($sub)) {
+            handleCustomCommand($sub, array_slice($arguments, 2), $baseDir);
+        } else {
+            handleServe($arguments);
+        }
         break;
 
     // Self-updater
@@ -249,8 +276,11 @@ switch ($command) {
     case 'help':
     case '--help':
     case '-h':
-    default:
         showHelp();
+        break;
+
+    default:
+        handleCustomCommand($command, array_slice($arguments, 1), $baseDir);
         break;
 }
 
@@ -1070,6 +1100,7 @@ function bootstrapApp(string $baseDir): void
                 'Model\\'             => $baseDir . '/Model/',
                 'Checkpoint\\'        => $baseDir . '/Checkpoint/',
                 'Database\\Seeders\\' => $baseDir . '/database/seeders/',
+                'Command\\'           => $baseDir . '/Command/',
             ];
 
             foreach ($prefixes as $prefix => $targetDir) {
@@ -1500,6 +1531,264 @@ function handleDbSeed(array $args, string $baseDir): void
     } catch (\Throwable $e) {
         echo color("\n[X] Seeding Error: " . $e->getMessage() . "\n\n", 'red');
     }
+}
+
+/**
+ * Handle make:command / add command.
+ * Generates custom CLI command / cron job in Command/.
+ */
+function handleMakeCommand(array $args, string $baseDir): void
+{
+    $name = $args[1] ?? null;
+
+    if (!$name) {
+        echo color("\n[!] Please specify a command name.\n", 'yellow');
+        echo "Usage: srin add command <Name>\n";
+        echo "Example: srin add command SendWeeklyDigest\n";
+        echo "         srin add command clean-expired-tokens\n\n";
+        return;
+    }
+
+    // Convert kebab-case, snake_case, colon:separated, or StudlyCase to StudlyCase class name
+    $parts = preg_split('/[-_:\s]+/', trim($name));
+    $className = '';
+    foreach ($parts as $part) {
+        $className .= ucfirst($part);
+    }
+    $className = preg_replace('/[^a-zA-Z0-9]/', '', $className);
+    if (empty($className)) {
+        echo color("\n[X] Error: Invalid command name provided.\n\n", 'red');
+        return;
+    }
+
+    // Signature (kebab-case):
+    $sigBase = preg_replace('/Command$/', '', $className);
+    if (empty($sigBase)) {
+        $sigBase = $className;
+    }
+    $signature = strtolower((string) preg_replace('/(?<!^)[A-Z]/', '-$0', $sigBase));
+
+    $dir = $baseDir . '/Command';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0755, true);
+    }
+
+    $filePath = $dir . "/{$className}.php";
+
+    if (file_exists($filePath)) {
+        echo color("\n[X] Error: Command [{$className}] already exists at Command/{$className}.php\n\n", 'red');
+        return;
+    }
+
+    $template = <<<PHP
+<?php
+
+namespace Command;
+
+use Core\Command;
+use Core\DB;
+use Core\Mailer;
+
+/**
+ * Custom Srin CLI Command & cPanel Cron Job
+ *
+ * Local CLI Run:
+ *   php srin {$signature}
+ *
+ * cPanel Cron Job:
+ *   /usr/local/bin/php /home/username/public_html/srin {$signature} >/dev/null 2>&1
+ */
+class {$className} extends Command
+{
+    /**
+     * The command signature / CLI trigger name.
+     */
+    public string \$name = '{$signature}';
+
+    /**
+     * Brief description of what this command does.
+     */
+    public string \$description = 'Execute {$className} automated task';
+
+    /**
+     * Execute the command logic.
+     *
+     * @param array \$args Command line arguments passed after the command name.
+     * @return int Exit code (0 for success, non-zero for error)
+     */
+    public function execute(array \$args): int
+    {
+        \$this->info("Running {$className}...");
+
+        // Example: access database, query models, or send emails
+        // \$users = DB::table('users')->where('active', 1)->get();
+        // \$this->line("Found " . count(\$users) . " active records.");
+
+        \$this->success("{$className} completed successfully!");
+        return 0;
+    }
+}
+PHP;
+
+    file_put_contents($filePath, $template);
+
+    echo color("\n[✓] Command [{$className}] created successfully!\n", 'green');
+    echo "  File:    " . color("Command/{$className}.php", 'cyan') . "\n";
+    echo "  Trigger: " . color("php srin {$signature}", 'yellow') . " (or " . color("srin {$signature}", 'yellow') . ")\n\n";
+
+    echo color("----------------------------------------------------------------------\n", 'cyan');
+    echo color("cPanel Cron Job Setup Guide:\n", 'bold');
+    echo color("----------------------------------------------------------------------\n", 'cyan');
+    echo "1. Log into your cPanel dashboard and open " . color("Cron Jobs", 'bold') . " (under Advanced).\n";
+    echo "2. Choose your execution schedule (e.g., Once Per Day: 0 0 * * * or Every Hour: 0 * * * *).\n";
+    echo "3. In the " . color("Command", 'bold') . " field, paste either of the following commands:\n\n";
+    echo "   " . color("/usr/local/bin/php /home/YOUR_CPANEL_USER/public_html/srin {$signature} >/dev/null 2>&1", 'green') . "\n\n";
+    echo "   Or using directory navigation:\n";
+    echo "   " . color("cd /home/YOUR_CPANEL_USER/public_html && /usr/local/bin/php srin {$signature} >/dev/null 2>&1", 'green') . "\n\n";
+    echo color("Tips:\n", 'yellow');
+    echo " • Replace " . color("/home/YOUR_CPANEL_USER/public_html", 'bold') . " with your server's absolute project path.\n";
+    echo " • The " . color(">/dev/null 2>&1", 'bold') . " at the end stops cPanel from spamming your email on every run.\n";
+    echo " • To save output into a log file instead, use:\n";
+    echo "   " . color("/usr/local/bin/php /home/YOUR_CPANEL_USER/public_html/srin {$signature} >> /home/YOUR_CPANEL_USER/public_html/cron.log 2>&1", 'cyan') . "\n";
+    echo color("----------------------------------------------------------------------\n\n", 'cyan');
+}
+
+/**
+ * Handle custom command execution.
+ */
+function handleCustomCommand(string $commandName, array $args, string $baseDir): void
+{
+    $dir = $baseDir . '/Command';
+    if (!is_dir($dir)) {
+        echo color("\n[X] Unknown command: '{$commandName}'.\n", 'red');
+        echo "Run " . color("php srin help", 'yellow') . " to see all available commands.\n\n";
+        exit(1);
+    }
+
+    bootstrapApp($baseDir);
+
+    $normalized = strtolower(str_replace([':', '_'], '-', $commandName));
+    $studly = str_replace(' ', '', ucwords(str_replace(['-', ':', '_'], ' ', $commandName)));
+
+    $matchedClass = null;
+    $files = glob($dir . '/*.php') ?: [];
+
+    // 1. Check exact class / file name matches
+    foreach ($files as $file) {
+        $base = basename($file, '.php');
+        if (strcasecmp($base, $studly) === 0 || strcasecmp($base, $studly . 'Command') === 0 || strcasecmp($base, $commandName) === 0) {
+            require_once $file;
+            $candidate = '\\Command\\' . $base;
+            if (class_exists($candidate)) {
+                $matchedClass = $candidate;
+                break;
+            }
+        }
+    }
+
+    // 2. Check property $name on Command classes
+    if (!$matchedClass) {
+        foreach ($files as $file) {
+            require_once $file;
+            $base = basename($file, '.php');
+            $candidate = '\\Command\\' . $base;
+            if (class_exists($candidate)) {
+                try {
+                    $ref = new \ReflectionClass($candidate);
+                    if ($ref->isInstantiable()) {
+                        $defaultProps = $ref->getDefaultProperties();
+                        $cmdSig = strtolower(trim((string) ($defaultProps['name'] ?? '')));
+                        if ($cmdSig !== '' && ($cmdSig === $normalized || $cmdSig === strtolower($commandName))) {
+                            $matchedClass = $candidate;
+                            break;
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+    }
+
+    if (!$matchedClass) {
+        echo color("\n[X] Unknown command: '{$commandName}'.\n", 'red');
+        echo "Run " . color("php srin help", 'yellow') . " to see all available commands.\n\n";
+        exit(1);
+    }
+
+    try {
+        $instance = new $matchedClass();
+        $exitCode = 0;
+        if (method_exists($instance, 'execute')) {
+            $exitCode = (int) $instance->execute($args);
+        } elseif (method_exists($instance, 'handle')) {
+            $exitCode = (int) $instance->handle($args);
+        }
+        exit($exitCode);
+    } catch (\Throwable $e) {
+        echo color("\n[X] Command Execution Error in [{$matchedClass}]:\n", 'red');
+        echo $e->getMessage() . "\n";
+        echo color("\nStack trace:\n", 'yellow');
+        echo $e->getTraceAsString() . "\n\n";
+        exit(1);
+    }
+}
+
+/**
+ * Handle listing all custom commands.
+ */
+function handleListCommands(string $baseDir): void
+{
+    $dir = $baseDir . '/Command';
+    if (!is_dir($dir)) {
+        echo color("\n[i] No custom commands directory found (Command/).\n", 'yellow');
+        echo "Create your first command with: " . color("srin add command <Name>\n\n", 'green');
+        return;
+    }
+
+    bootstrapApp($baseDir);
+    $files = glob($dir . '/*.php') ?: [];
+    if (empty($files)) {
+        echo color("\n[i] No custom commands found in Command/.\n", 'yellow');
+        echo "Create your first command with: " . color("srin add command <Name>\n\n", 'green');
+        return;
+    }
+
+    echo color("\n========================================================\n", 'cyan');
+    echo color("               REGISTERED CUSTOM COMMANDS               \n", 'bold');
+    echo color("========================================================\n", 'cyan');
+
+    $rows = [];
+    foreach ($files as $file) {
+        require_once $file;
+        $base = basename($file, '.php');
+        $candidate = '\\Command\\' . $base;
+        if (class_exists($candidate)) {
+            try {
+                $ref = new \ReflectionClass($candidate);
+                if ($ref->isInstantiable()) {
+                    $defaultProps = $ref->getDefaultProperties();
+                    $sig = $defaultProps['name'] ?? strtolower((string) preg_replace('/(?<!^)[A-Z]/', '-$0', $base));
+                    $desc = $defaultProps['description'] ?? 'Custom automated command';
+                    $rows[] = [
+                        'name'  => $sig,
+                        'class' => $base,
+                        'desc'  => $desc,
+                    ];
+                }
+            } catch (\Throwable $e) {}
+        }
+    }
+
+    if (empty($rows)) {
+        echo "No valid command classes found in Command/.\n\n";
+        return;
+    }
+
+    foreach ($rows as $r) {
+        echo "  " . color(str_pad($r['name'], 28), 'green') . " " . $r['desc'] . " " . color("({$r['class']})", 'cyan') . "\n";
+    }
+
+    echo "\nRun locally:  " . color("php srin <command-name>\n", 'yellow');
+    echo "cPanel Cron:  " . color("/usr/local/bin/php /home/username/public_html/srin <command-name> >/dev/null 2>&1\n\n", 'yellow');
 }
 
 /**
@@ -2017,6 +2306,7 @@ function showHelp(): void
     echo "  " . color("add model <Name> [-m]", 'green') . "            Add a model in Model/ (and migration with -m)\n";
     echo "  " . color("add migration <name>", 'green') . "             Add a migration in database/migrations/\n";
     echo "  " . color("add checkpoint <Name>", 'green') . "            Add a request checkpoint (gate) in Checkpoint/\n";
+    echo "  " . color("add command <Name>", 'green') . "               Add a custom CLI & cPanel cron command in Command/\n";
     echo "  " . color("add seeder <Name>", 'green') . "                Add a database seeder in database/seeders/\n";
     echo "  " . color("add page <name>", 'green') . "                  Add a frontend page (Pages/name.srin.php)\n";
     echo "  " . color("add layout <name>", 'green') . "                Add a master layout (Pages/layouts/name.srin.php)\n";
@@ -2032,6 +2322,7 @@ function showHelp(): void
 
     echo color("APPLICATION COMMANDS:\n", 'yellow');
     echo "  " . color("init [--force]", 'green') . "                    Initialize project (.env, project name, APP_KEY)\n";
+    echo "  " . color("commands", 'green') . "                          List all custom CLI and cPanel cron commands\n";
     echo "  " . color("links", 'green') . "                            List all registered route links from Routes/link.php\n";
     echo "  " . color("dev [--port=8000]", 'green') . "                Start local PHP development server\n";
     echo "  " . color("key [--force]", 'green') . "                    Generate application 256-bit encryption key (APP_KEY)\n";
@@ -2041,9 +2332,40 @@ function showHelp(): void
     echo "  " . color("upgrade [--force] [--check]", 'green') . "      Upgrade Srin Engine to latest release\n";
     echo "  " . color("help", 'green') . "                             Display this help screen\n\n";
 
+    // Dynamic custom commands section
+    $cmdDir = __DIR__ . '/Command';
+    if (is_dir($cmdDir)) {
+        $cmdFiles = glob($cmdDir . '/*.php') ?: [];
+        if (!empty($cmdFiles)) {
+            bootstrapApp(__DIR__);
+            echo color("CUSTOM COMMANDS (Command/):\n", 'yellow');
+            foreach ($cmdFiles as $file) {
+                $base = basename($file, '.php');
+                $candidate = '\\Command\\' . $base;
+                if (!class_exists($candidate, false)) {
+                    @include_once $file;
+                }
+                if (class_exists($candidate, false)) {
+                    try {
+                        $ref = new \ReflectionClass($candidate);
+                        if ($ref->isInstantiable()) {
+                            $props = $ref->getDefaultProperties();
+                            $sig = $props['name'] ?? strtolower((string) preg_replace('/(?<!^)[A-Z]/', '-$0', $base));
+                            $desc = $props['description'] ?? 'Custom automated command';
+                            echo "  " . color(str_pad($sig, 30), 'green') . " " . $desc . "\n";
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+            echo "\n";
+        }
+    }
+
     echo color("EXAMPLES:\n", 'yellow');
     echo "  srin add controller About\n";
     echo "  srin add controller Contact --mail\n";
+    echo "  srin add command SendWeeklyDigest\n";
+    echo "  srin send-weekly-digest\n";
     echo "  srin add model Post -m\n";
     echo "  srin add migration create_inquiries_table\n";
     echo "  srin add checkpoint AuthGate\n";

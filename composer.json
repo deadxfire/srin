@@ -34,7 +34,8 @@
             "Config\\": "Config/",
             "Model\\": "Model/",
             "Checkpoint\\": "Checkpoint/",
-            "Database\\Seeders\\": "database/seeders/"
+            "Database\\Seeders\\": "database/seeders/",
+            "Command\\": "Command/"
         },
         "files": [
             "Core/Helper.php"
