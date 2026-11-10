@@ -248,8 +248,10 @@ return download('catalog.pdf', 'Company_Catalog.pdf');
 ```
 - Attempting to download from `Pages/`, `Core/`, `Config/`, or traversing directories (`../../etc/passwd`) is immediately blocked and **throws a 404 error**.
 
-### 7. Strict Template Extension (`.srin.php`)
-Only `.srin.php` template files inside `Pages/` are executed. Standard `.php` templates (e.g. `Pages/portfolio.php`) are strictly rejected.
+### 7. Strict Template Extension (`.srin.php`) & Secure Compilation Cache
+- **Pages/ Directory Enforcement**: Only `.srin.php` template files strictly residing within `Pages/` are executed. Directory traversal attempts (`../`) and standard `.php` templates are strictly rejected.
+- **Compiled Disk Cache**: Compiled templates are written to a secure private cache directory (`Others/cache/views/`, permissions `0700`, with `.htaccess` `Require all denied` and `index.html`) and executed via `include` instead of `eval()`.
+- **Trusted Template Source Contract**: Template source code must strictly be developer-authored and trusted. Dynamic user/request data must always be passed into views via the `$data` parameters array (e.g., `view('page', ['user' => $input])`) and **never** concatenated or interpolated into template source.
 
 ---
 

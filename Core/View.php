@@ -4,12 +4,29 @@ namespace Core;
 
 use Exception;
 
+/**
+ * Srin View Engine
+ *
+ * Compiles and renders Srin (.srin.php) template files into PHP cache files.
+ * Replaces eval() with secure compiled template disk caching (0700 permissions)
+ * and strict Pages/ directory boundary enforcement.
+ *
+ * SECURITY CONTRACT:
+ * - Template source code must strictly be trusted developer-authored code.
+ * - Never concatenate untrusted user/request input into template source.
+ * - Always pass dynamic user data via the $data array parameters to ensure proper escaping.
+ */
 class View
 {
     /**
      * Base directory where view pages are located.
      */
     protected static string $pagesPath = __DIR__ . '/../Pages';
+
+    /**
+     * Base directory where compiled view cache files are stored.
+     */
+    protected static string $cacheDir = '';
 
     /**
      * Set base directory where view pages are located.
@@ -25,6 +42,55 @@ class View
     public static function getPagesPath(): string
     {
         return self::$pagesPath;
+    }
+
+    /**
+     * Get or initialize the secure compiled view cache directory (mode 0700).
+     */
+    public static function getCacheDir(): string
+    {
+        if (self::$cacheDir === '') {
+            self::$cacheDir = dirname(__DIR__) . '/Others/cache/views';
+        }
+        if (!is_dir(self::$cacheDir)) {
+            @mkdir(self::$cacheDir, 0700, true);
+        }
+        @chmod(self::$cacheDir, 0700);
+        $ht = self::$cacheDir . '/.htaccess';
+        if (!file_exists($ht)) {
+            @file_put_contents($ht, "<IfModule mod_authz_core.c>\n    Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n    Order Deny,Allow\n    Deny from all\n</IfModule>\n");
+        }
+        $index = self::$cacheDir . '/index.html';
+        if (!file_exists($index)) {
+            @file_put_contents($index, "<!DOCTYPE html><html><head><title>403 Forbidden</title></head><body></body></html>\n");
+        }
+        return self::$cacheDir;
+    }
+
+    /**
+     * Set a custom compiled view cache directory.
+     */
+    public static function setCacheDir(string $path): void
+    {
+        self::$cacheDir = $path;
+    }
+
+    /**
+     * Clear all compiled template cache files.
+     */
+    public static function clearCache(): bool
+    {
+        $dir = self::getCacheDir();
+        if (!is_dir($dir)) {
+            return true;
+        }
+        $files = glob($dir . DIRECTORY_SEPARATOR . '*.php');
+        if ($files) {
+            foreach ($files as $file) {
+                @unlink($file);
+            }
+        }
+        return true;
     }
 
     /**
@@ -113,6 +179,14 @@ class View
 
     /**
      * Render a raw template string with compiled directives and data.
+     *
+     * SECURITY WARNING:
+     * Never compile strings containing untrusted user/request data into $template.
+     * The $template source must strictly be trusted developer-authored template code.
+     * User/request data must strictly be passed via the $data parameters array.
+     *
+     * @param string $template Trusted template string
+     * @param array  $data     Data variables passed to template scope
      */
     public static function renderString(string $template, array $data = []): string
     {
@@ -132,11 +206,19 @@ class View
             $layoutFile = self::resolveFilePath('layouts/' . $layout);
         }
 
-        if (!file_exists($layoutFile)) {
+        $realPages = realpath(self::$pagesPath);
+        $realLayoutFile = realpath($layoutFile);
+
+        if (!$realLayoutFile || !file_exists($realLayoutFile)) {
             throw new Exception("Srin layout [{$layout}] not found at {$layoutFile}. All layouts must use the [.srin.php] extension.");
         }
 
-        $layoutRaw = file_get_contents($layoutFile);
+        // Security check: Layout must reside strictly within Pages directory
+        if (!$realPages || !str_starts_with($realLayoutFile, $realPages . DIRECTORY_SEPARATOR)) {
+            throw new Exception("Security violation: Layout [{$layout}] is located outside the Pages directory.");
+        }
+
+        $layoutRaw = file_get_contents($realLayoutFile);
 
         // Compile layout directives (@include, {{ }}, @csrf, etc.)
         $compiledLayout = self::compileDirectives($layoutRaw);
@@ -181,11 +263,19 @@ class View
             $partialFile = self::resolveFilePath('partials/' . $partial);
         }
 
-        if (!file_exists($partialFile)) {
+        $realPages = realpath(self::$pagesPath);
+        $realPartialFile = realpath($partialFile);
+
+        if (!$realPartialFile || !file_exists($realPartialFile)) {
             throw new Exception("Srin partial [{$partial}] not found at {$partialFile}. All partials must use the [.srin.php] extension.");
         }
 
-        $raw = file_get_contents($partialFile);
+        // Security check: Partial must reside strictly within Pages directory
+        if (!$realPages || !str_starts_with($realPartialFile, $realPages . DIRECTORY_SEPARATOR)) {
+            throw new Exception("Security violation: Partial [{$partial}] is located outside the Pages directory.");
+        }
+
+        $raw = file_get_contents($realPartialFile);
         $compiled = self::compileDirectives($raw);
 
         return self::evaluate($compiled, $data);
@@ -415,37 +505,72 @@ class View
     }
 
     /**
-     * Evaluate compiled template code in an isolated scope.
+     * Evaluate compiled template code in an isolated scope via cached file inclusion.
+     * Replaces eval() to prevent remote code execution and optimize performance via OPcache.
+     *
+     * @param string $__srin_code__ Compiled PHP template code
+     * @param array  $__srin_data__ Variables extracted into template scope
+     * @return string Rendered template HTML/text output
      */
     public static function evaluate(string $__srin_code__, array $__srin_data__): string
     {
-        return (static function () use ($__srin_code__, $__srin_data__) {
+        if (!defined('SRIN_SECURE')) {
+            define('SRIN_SECURE', true);
+        }
+
+        $cacheDir = self::getCacheDir();
+        $cacheKey = hash('sha256', $__srin_code__);
+        $cacheFile = $cacheDir . DIRECTORY_SEPARATOR . $cacheKey . '.php';
+
+        if (!file_exists($cacheFile)) {
+            $tmpFile = $cacheDir . DIRECTORY_SEPARATOR . $cacheKey . '_' . bin2hex(random_bytes(8)) . '.tmp';
+            $cachedContent = "<?php\n// Srin Engine - Compiled View Cache\nif (!defined('SRIN_SECURE')) { exit; }\n?>\n" . $__srin_code__;
+            @file_put_contents($tmpFile, $cachedContent, LOCK_EX);
+            @chmod($tmpFile, 0600);
+            if (!@rename($tmpFile, $cacheFile)) {
+                @copy($tmpFile, $cacheFile);
+                @unlink($tmpFile);
+            }
+        }
+
+        return (static function ($__srin_cache_file__, $__srin_data__) {
             extract($__srin_data__, EXTR_SKIP);
             unset($__srin_data__);
 
             ob_start();
             try {
-                eval('?>' . $__srin_code__);
+                include $__srin_cache_file__;
             } catch (\Throwable $__srin_e__) {
                 ob_end_clean();
                 throw $__srin_e__;
             }
 
             return ob_get_clean() ?: '';
-        })();
+        })($cacheFile, $__srin_data__);
     }
 
     /**
      * Resolve full file path for a view or partial name.
-     * Enforces strictly the .srin.php template format.
+     * Enforces strictly the .srin.php template format and guarantees resolution within Pages/.
      * Supports dot-notation e.g. 'partials.header' -> 'Pages/partials/header.srin.php'
      */
     protected static function resolveFilePath(string $name): string
     {
-        // Strip any directory traversal attempts (../ or ..\)
-        $name = str_replace(['../', '..\\'], '', $name);
-        $clean = ltrim($name, '/\\');
-        $base = rtrim(self::$pagesPath, '/\\') . DIRECTORY_SEPARATOR;
+        $decoded = rawurldecode($name);
+        if (
+            str_contains($name, "\0") || str_contains($name, '..') ||
+            str_contains($decoded, "\0") || str_contains($decoded, '..')
+        ) {
+            throw new \InvalidArgumentException("Security violation: Directory traversal detected in template name [{$name}].");
+        }
+
+        $realPages = realpath(self::$pagesPath);
+        if (!$realPages) {
+            throw new Exception("Pages directory [" . self::$pagesPath . "] not found.");
+        }
+
+        $clean = ltrim(str_replace(['\\', '/'], '/', $name), '/');
+        $base = $realPages . DIRECTORY_SEPARATOR;
 
         // If user already specified .srin.php or .php, strip it to normalize
         if (str_ends_with($clean, '.srin.php')) {
@@ -456,40 +581,44 @@ class View
 
         // Support dot notation: 'partials.header' or 'components.card' -> 'partials/header'
         $clean = str_replace(['.', '/'], DIRECTORY_SEPARATOR, $clean);
-        $clean = str_replace('..' . DIRECTORY_SEPARATOR, '', $clean);
 
         // 1. Direct path check
-        $srinFile = $base . $clean . '.srin.php';
-        if (file_exists($srinFile)) {
-            return $srinFile;
-        }
+        $candidates = [
+            $base . $clean . '.srin.php',
+        ];
 
         // 2. Fallbacks for partials / components / includes / layouts
         foreach (['partials', 'includes', 'components', 'layouts'] as $sub) {
-            $fallback = $base . $sub . DIRECTORY_SEPARATOR . $clean . '.srin.php';
-            if (file_exists($fallback)) {
-                return $fallback;
-            }
+            $candidates[] = $base . $sub . DIRECTORY_SEPARATOR . $clean . '.srin.php';
         }
 
-        // 3. Normalize singular folder prefixes (e.g. 'layout/main' -> 'layouts/main', 'partial/navbar' -> 'partials/navbar')
+        // 3. Normalize singular folder prefixes (e.g. 'layout/main' -> 'layouts/main')
         $normalizedPlural = preg_replace('/^(layout|partial|include|component)(' . preg_quote(DIRECTORY_SEPARATOR, '/') . ')/i', '${1}s$2', $clean);
         if ($normalizedPlural !== $clean) {
-            $pluralFile = $base . $normalizedPlural . '.srin.php';
-            if (file_exists($pluralFile)) {
-                return $pluralFile;
-            }
+            $candidates[] = $base . $normalizedPlural . '.srin.php';
         }
 
         // 4. Check inside layouts/ after stripping 'layout/' or 'layouts/' prefix
         $strippedLayout = preg_replace('/^layouts?(' . preg_quote(DIRECTORY_SEPARATOR, '/') . ')/i', '', $clean);
         if ($strippedLayout !== $clean) {
-            $layoutCandidate = $base . 'layouts' . DIRECTORY_SEPARATOR . $strippedLayout . '.srin.php';
-            if (file_exists($layoutCandidate)) {
-                return $layoutCandidate;
+            $candidates[] = $base . 'layouts' . DIRECTORY_SEPARATOR . $strippedLayout . '.srin.php';
+        }
+
+        foreach ($candidates as $cand) {
+            if (file_exists($cand)) {
+                $realCand = realpath($cand);
+                if ($realCand && str_starts_with($realCand, $base) && is_file($realCand)) {
+                    return $realCand;
+                }
             }
         }
 
-        return $srinFile;
+        $defaultPath = $base . $clean . '.srin.php';
+        $realDefault = realpath($defaultPath);
+        if ($realDefault && !str_starts_with($realDefault, $base)) {
+            throw new Exception("Security violation: Template [{$name}] resolves outside the Pages directory.");
+        }
+
+        return $defaultPath;
     }
 }
