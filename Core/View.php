@@ -141,16 +141,7 @@ class View
         }
 
         // 3. Extract named content sections: [block 'name']...[blockend] or [/block]
-        $sections = [];
-        $sectionPattern = '/\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section))\]/si';
-
-        $rawContent = preg_replace_callback($sectionPattern, function ($m) use (&$sections, $data) {
-            $name = trim($m[1] ?? '');
-            $blockRaw = $m[2] ?? '';
-            $compiledBlock = self::compileDirectives($blockRaw);
-            $sections[$name] = self::evaluate($compiledBlock, $data);
-            return '';
-        }, $rawContent);
+        [$rawContent, $sections] = self::extractSections($rawContent, $data);
 
         // If child page defined a [block 'title'], set $data['title'] automatically
         if (!empty($sections['title']) && empty($data['title'])) {
@@ -279,6 +270,66 @@ class View
         $compiled = self::compileDirectives($raw);
 
         return self::evaluate($compiled, $data);
+    }
+
+    /**
+     * Extract named content sections: [block 'name']...[blockend] or [/block].
+     * Parses by nesting depth, compiles nested directives first, and enforces balanced block tags.
+     *
+     * @param string $content Raw page content
+     * @param array  $data    View data
+     * @return array [string $remainingContent, array $sections]
+     */
+    protected static function extractSections(string $content, array $data): array
+    {
+        $sections = [];
+        $pattern = '/(\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\])|(\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section))\])/i';
+
+        if (!preg_match_all($pattern, $content, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE)) {
+            return [$content, $sections];
+        }
+
+        $stack = [];
+        $result = '';
+        $lastPos = 0;
+
+        foreach ($matches as $match) {
+            $fullTag = $match[0][0];
+            $tagOffset = $match[0][1];
+
+            if (!empty($match[1][0])) {
+                // Opening tag: [block 'name']
+                $blockName = trim($match[2][0]);
+                if (empty($stack)) {
+                    $result .= substr($content, $lastPos, $tagOffset - $lastPos);
+                }
+                $stack[] = [
+                    'name' => $blockName,
+                    'start_content' => $tagOffset + strlen($fullTag),
+                ];
+            } else {
+                // Closing tag: [blockend]
+                if (empty($stack)) {
+                    throw new Exception("Srin Template Error: Unexpected closing tag [{$fullTag}] without a matching [block].");
+                }
+                $open = array_pop($stack);
+                if (empty($stack)) {
+                    $blockRaw = substr($content, $open['start_content'], $tagOffset - $open['start_content']);
+                    // Compile nested directives inside the block first
+                    $compiledBlock = self::compileDirectives($blockRaw);
+                    $sections[$open['name']] = self::evaluate($compiledBlock, $data);
+                    $lastPos = $tagOffset + strlen($fullTag);
+                }
+            }
+        }
+
+        if (!empty($stack)) {
+            $unclosed = end($stack);
+            throw new Exception("Srin Template Error: Unclosed block [{$unclosed['name']}]. Expected matching [blockend] or [/block].");
+        }
+
+        $result .= substr($content, $lastPos);
+        return [$result, $sections];
     }
 
     /**
@@ -474,10 +525,7 @@ class View
                             return $closingCode;
                         }
                     }
-                    if ($expected === 'each') return "<?php endforeach; ?>";
-                    if ($expected === 'for') return "<?php endfor; ?>";
-                    if ($expected === 'while') return "<?php endwhile; ?>";
-                    return "<?php endif; ?>";
+                    throw new Exception("Srin Template Error: Unbalanced tag. Found closing [{$tag}] without a matching opening [{$expected}].");
                 }
 
                 // Universal fallback closer: [end]
@@ -490,11 +538,16 @@ class View
                     if ($closed['type'] === 'while') return "<?php endwhile; ?>";
                     return "<?php endif; ?>";
                 }
-                return "<?php endif; ?>";
+                throw new Exception("Srin Template Error: Unexpected closing tag [end] without a matching opening tag.");
             }
 
             return $full;
         }, $template);
+
+        if (!empty($stack)) {
+            $unclosed = array_map(fn($item) => '[' . $item['type'] . ']', $stack);
+            throw new Exception("Srin Template Error: Unbalanced tag(s) detected. Missing closing tag for: " . implode(', ', $unclosed) . ".");
+        }
 
         // 7. Restore escaped tokens as literal
         if (!empty($escapedTokens)) {
