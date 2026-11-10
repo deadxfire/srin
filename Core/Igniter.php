@@ -267,36 +267,42 @@ class Igniter
         // 1. Load environment variables
         App::loadEnv();
 
-        // 2. Send Hardened Security Headers
-        if (!headers_sent()) {
-            header('X-Content-Type-Options: nosniff');
-            header('X-Frame-Options: SAMEORIGIN');
-            header('X-XSS-Protection: 1; mode=block');
-            header('Referrer-Policy: strict-origin-when-cross-origin');
-            header_remove('X-Powered-By');
-        }
+        // 2. Detect HTTPS / secure transport (direct or behind reverse proxies)
+        $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+            || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
 
         // 3. Configure Hardened Session Settings & Lazy Session Start
         if (session_status() === PHP_SESSION_NONE) {
             ini_set('session.cookie_httponly', '1');
             ini_set('session.use_only_cookies', '1');
             ini_set('session.use_strict_mode', '1');
+            ini_set('session.use_trans_sid', '0');
             ini_set('session.cookie_samesite', 'Lax');
-
-            $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
-                || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
-                || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
-                || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
 
             if ($isHttps) {
                 ini_set('session.cookie_secure', '1');
             }
 
-            // Only resume session if client already sent a session cookie, avoiding disk spam on bot hits
+            // Lazy session start: only resume session if client already sent a session cookie, avoiding disk spam on bot hits
             $sessionCookieName = session_name();
             if (!empty($_COOKIE[$sessionCookieName])) {
                 session_start();
             }
+        }
+
+        // 4. Send Hardened Security Headers
+        if (!headers_sent()) {
+            header('X-Content-Type-Options: nosniff');
+            header('X-Frame-Options: SAMEORIGIN');
+            header('X-XSS-Protection: 0');
+            header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+            header('Referrer-Policy: strict-origin-when-cross-origin');
+            if ($isHttps) {
+                header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+            }
+            header_remove('X-Powered-By');
         }
 
         // 4. Register class alias for BaseController

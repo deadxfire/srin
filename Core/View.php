@@ -208,9 +208,9 @@ class View
         // 1. Strip comments: [-- ... --]
         $template = preg_replace('/\[--.*?--\]/s', '', $template);
 
-        // 2. Temporarily protect escaped brackets: @[[ ... ]] or @[{ ... }]
+        // 2. Temporarily protect escaped brackets: @[[ ... ]] or @[{ ... }] or @{{ ... }}
         $escapedTokens = [];
-        $template = preg_replace_callback('/@(\[\[.*?\]\]|\[\{.*?\}\])/s', function ($m) use (&$escapedTokens) {
+        $template = preg_replace_callback('/@(\[\[.*?\]\]|\[\{.*?\}\]|\{\{.*?\}\})/s', function ($m) use (&$escapedTokens) {
             $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
             $escapedTokens[$token] = $m[1]; // Store literal content without '@'
             return $token;

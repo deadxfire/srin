@@ -569,17 +569,17 @@ public function index(): string
 }
 
 // In your .srin.php template:
-[each \$articles as \$article]
+&#91;each $articles as $article&#93;
     &lt;article class="article-card"&gt;
-        &lt;h2&gt;@{{ \$article-&gt;title }}&lt;/h2&gt;
-        &lt;p&gt;@{{ \$article-&gt;summary }}&lt;/p&gt;
+        &lt;h2&gt;&#91;&#91; $article-&gt;title &#93;&#93;&lt;/h2&gt;
+        &lt;p&gt;&#91;&#91; $article-&gt;summary &#93;&#93;&lt;/p&gt;
     &lt;/article&gt;
-[eachend]
+&#91;eachend&#93;
 
 &lt;!-- Render responsive pagination controls (prev, numbered pills, next): --&gt;
-[paginate \$articles]
+&#91;paginate $articles&#93;
 &lt;!-- Or render raw links: --&gt;
-@{!! \$articles-&gt;links() !!}</code></pre>
+&#91;&#123; $articles-&gt;links() &#125;&#93;</code></pre>
 
                         <h3>8. Database Options &amp; Multi-Driver Connections (<code>Config/database.php</code>):</h3>
                         <p>Srin Engine supports <strong>SQLite</strong>, <strong>MySQL / MariaDB</strong>, and <strong>PostgreSQL</strong> natively. Configure your default connection in <code>.env</code>:</p>
@@ -1087,13 +1087,13 @@ class ArticleController extends BaseController
 &lt;/form&gt;</code></pre>
 
                         <h3>Control Flow Directives (Clean Srin Tags &amp; Descriptive Closers):</h3>
-                        <pre><code>[if count(\$projects) &gt; 0]
-    [each \$projects as \$project]
-        &lt;div class="card"&gt;@{{ \$project['title'] }}&lt;/div&gt;
-    [eachend]
-[else]
+                        <pre><code>&#91;if count($projects) &gt; 0&#93;
+    &#91;each $projects as $project&#93;
+        &lt;div class="card"&gt;&#91;&#91; $project['title'] &#93;&#93;&lt;/div&gt;
+    &#91;eachend&#93;
+&#91;else&#93;
     &lt;p&gt;No projects found.&lt;/p&gt;
-[ifend]</code></pre>
+&#91;ifend&#93;</code></pre>
 
                         <h3>Master Layout with Named Slots: <code>[blockinclude 'name']</code> or <code>[slot 'name']</code></h3>
                         <p>In any layout (e.g. <code>Pages/layouts/main.srin.php</code>), define named injection slots using <code>[blockinclude 'main']</code> or <code>[slot 'slot_name']</code> alongside the primary content slot:</p>
@@ -1131,22 +1131,22 @@ class ArticleController extends BaseController
                         <h3>Connecting Content on Pages: <code>[connect 'layouts/main']</code> &amp; Dynamic Titles</h3>
                         <p>On your page (e.g. <code>Pages/home.srin.php</code>), connect to the layout using <code>[connect 'layouts/main']</code> (or <code>[connect 'main']</code>). You can specify static or dynamic titles, and inject custom blocks using <code>[block 'name'] ... [blockend]</code>:</p>
                         
-                        <pre><code>[connect 'layouts/main']
+                        <pre><code>&#91;connect 'layouts/main'&#93;
 &lt;!-- Dynamic PHP expression evaluated with controller data: --&gt;
-[title \$article-&gt;title . ' - ' . config('name')]
+&#91;title $article-&gt;title . ' - ' . config('name')&#93;
 
 &lt;!-- Option 1: Wrap page in named block --&gt;
-[block 'main']
+&#91;block 'main'&#93;
 &lt;section class="services"&gt;
-    &lt;h1&gt;@{{ \$article-&gt;title }}&lt;/h1&gt;
-    &lt;p&gt;@{{ \$article-&gt;content }}&lt;/p&gt;
+    &lt;h1&gt;&#91;&#91; $article-&gt;title &#93;&#93;&lt;/h1&gt;
+    &lt;p&gt;&#91;&#91; $article-&gt;content &#93;&#93;&lt;/p&gt;
 &lt;/section&gt;
-[blockend]
+&#91;blockend&#93;
 
 &lt;!-- Push scripts into layout [blockinclude 'scripts'] --&gt;
-[block 'scripts']
+&#91;block 'scripts'&#93;
 &lt;script&gt;console.log('Page loaded');&lt;/script&gt;
-[blockend]</code></pre>
+&#91;blockend&#93;</code></pre>
 
                         <h3>Including Partials: <code>[include 'path.file']</code></h3>
                         <p>Add reusable partial views directly into any webpage using clean dot-notation or slash paths (e.g. <code>[include 'partials.navbar']</code> or <code>[include 'components.card']</code>). All webpage variables are automatically inherited, and you can pass custom parameters:</p>
