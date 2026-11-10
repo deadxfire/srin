@@ -333,6 +333,257 @@ class View
     }
 
     /**
+     * Scan and compile output tags ([[ ]], [{ }], {{ }}) and escaped tags (@[[, @[{, @{{).
+     * Uses a character scanner tracking bracket depth and quotes to prevent premature truncation
+     * on nested array keys like [[ $a[$b[0]] ]].
+     */
+    protected static function scanOutputTags(string $template, array &$escapedTokens = []): string
+    {
+        $len = strlen($template);
+        $result = '';
+        $i = 0;
+
+        while ($i < $len) {
+            // 1. Escaped tags: @[[ ... ]], @[{ ... }], @{{ ... }}
+            if ($template[$i] === '@' && $i + 2 < $len) {
+                $next2 = $template[$i + 1] . $template[$i + 2];
+                if ($next2 === '[[' || $next2 === '[{' || $next2 === '{{') {
+                    $closeType = match ($next2) {
+                        '[[' => ']]',
+                        '[{' => '}]',
+                        '{{' => '}}',
+                    };
+                    $j = $i + 3;
+                    $depth = 0;
+                    $inSingle = false;
+                    $inDouble = false;
+                    $matched = false;
+
+                    while ($j < $len) {
+                        $c = $template[$j];
+                        if ($inSingle) {
+                            if ($c === '\\') {
+                                $j += 2;
+                                continue;
+                            }
+                            if ($c === "'") {
+                                $inSingle = false;
+                            }
+                        } elseif ($inDouble) {
+                            if ($c === '\\') {
+                                $j += 2;
+                                continue;
+                            }
+                            if ($c === '"') {
+                                $inDouble = false;
+                            }
+                        } else {
+                            if ($c === "'") {
+                                $inSingle = true;
+                            } elseif ($c === '"') {
+                                $inDouble = true;
+                            } elseif ($closeType === ']]') {
+                                if ($c === '[') {
+                                    $depth++;
+                                } elseif ($c === ']') {
+                                    if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
+                                        $matched = true;
+                                        $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
+                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $result .= $token;
+                                        $i = $j + 2;
+                                        break;
+                                    }
+                                    if ($depth > 0) {
+                                        $depth--;
+                                    }
+                                }
+                            } elseif ($closeType === '}]') {
+                                if ($c === '{') {
+                                    $depth++;
+                                } elseif ($c === '}') {
+                                    if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
+                                        $matched = true;
+                                        $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
+                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $result .= $token;
+                                        $i = $j + 2;
+                                        break;
+                                    }
+                                    if ($depth > 0) {
+                                        $depth--;
+                                    }
+                                }
+                            } elseif ($closeType === '}}') {
+                                if ($c === '{') {
+                                    $depth++;
+                                } elseif ($c === '}') {
+                                    if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === '}') {
+                                        $matched = true;
+                                        $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
+                                        $escapedTokens[$token] = substr($template, $i + 1, ($j + 2) - ($i + 1));
+                                        $result .= $token;
+                                        $i = $j + 2;
+                                        break;
+                                    }
+                                    if ($depth > 0) {
+                                        $depth--;
+                                    }
+                                }
+                            }
+                        }
+                        $j++;
+                    }
+
+                    if ($matched) {
+                        continue;
+                    }
+                }
+            }
+
+            // 2. Raw unescaped output: [{ $expression }]
+            if ($i + 1 < $len && $template[$i] === '[' && $template[$i + 1] === '{') {
+                $j = $i + 2;
+                $depth = 0;
+                $inSingle = false;
+                $inDouble = false;
+                $matched = false;
+
+                while ($j < $len) {
+                    $c = $template[$j];
+                    if ($inSingle) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === "'") { $inSingle = false; }
+                    } elseif ($inDouble) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === '"') { $inDouble = false; }
+                    } else {
+                        if ($c === "'") { $inSingle = true; }
+                        elseif ($c === '"') { $inDouble = true; }
+                        elseif ($c === '{') { $depth++; }
+                        elseif ($c === '}') {
+                            if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
+                                $matched = true;
+                                $expr = trim(substr($template, $i + 2, $j - ($i + 2)));
+                                $result .= "<?= {$expr} ?>";
+                                $i = $j + 2;
+                                break;
+                            }
+                            if ($depth > 0) { $depth--; }
+                        }
+                    }
+                    $j++;
+                }
+
+                if ($matched) {
+                    continue;
+                }
+            }
+
+            // 3. Double brackets safe output: [[ $expression ]]
+            if ($i + 1 < $len && $template[$i] === '[' && $template[$i + 1] === '[') {
+                $j = $i + 2;
+                $depth = 0;
+                $inSingle = false;
+                $inDouble = false;
+                $matched = false;
+
+                while ($j < $len) {
+                    $c = $template[$j];
+                    if ($inSingle) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === "'") { $inSingle = false; }
+                    } elseif ($inDouble) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === '"') { $inDouble = false; }
+                    } else {
+                        if ($c === "'") { $inSingle = true; }
+                        elseif ($c === '"') { $inDouble = true; }
+                        elseif ($c === '[') { $depth++; }
+                        elseif ($c === ']') {
+                            if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
+                                $matched = true;
+                                $expr = trim(substr($template, $i + 2, $j - ($i + 2)));
+                                if ($expr === '') {
+                                    $result .= '[[ ]]';
+                                } else {
+                                    $expr = rtrim($expr, ';');
+                                    if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
+                                        $result .= "<?= {$expr} ?>";
+                                    } else {
+                                        $result .= "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
+                                    }
+                                }
+                                $i = $j + 2;
+                                break;
+                            }
+                            if ($depth > 0) { $depth--; }
+                        }
+                    }
+                    $j++;
+                }
+
+                if ($matched) {
+                    continue;
+                }
+            }
+
+            // 4. Double braces safe output alias: {{ $expression }}
+            if ($i + 1 < $len && $template[$i] === '{' && $template[$i + 1] === '{') {
+                $j = $i + 2;
+                $depth = 0;
+                $inSingle = false;
+                $inDouble = false;
+                $matched = false;
+
+                while ($j < $len) {
+                    $c = $template[$j];
+                    if ($inSingle) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === "'") { $inSingle = false; }
+                    } elseif ($inDouble) {
+                        if ($c === '\\') { $j += 2; continue; }
+                        if ($c === '"') { $inDouble = false; }
+                    } else {
+                        if ($c === "'") { $inSingle = true; }
+                        elseif ($c === '"') { $inDouble = true; }
+                        elseif ($c === '{') { $depth++; }
+                        elseif ($c === '}') {
+                            if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === '}') {
+                                $matched = true;
+                                $expr = trim(substr($template, $i + 2, $j - ($i + 2)));
+                                if ($expr === '') {
+                                    $result .= '{{ }}';
+                                } else {
+                                    $expr = rtrim($expr, ';');
+                                    if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
+                                        $result .= "<?= {$expr} ?>";
+                                    } else {
+                                        $result .= "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
+                                    }
+                                }
+                                $i = $j + 2;
+                                break;
+                            }
+                            if ($depth > 0) { $depth--; }
+                        }
+                    }
+                    $j++;
+                }
+
+                if ($matched) {
+                    continue;
+                }
+            }
+
+            $result .= $template[$i];
+            $i++;
+        }
+
+        return $result;
+    }
+
+    /**
      * Compile lightweight template directives.
      * Supports Srin Tags ([if], [each], [else], [empty], [end]), Svelte-style ({#if}, {#each}),
      * and legacy Blade-style (@if, @foreach) for full backward compatibility.
@@ -349,35 +600,10 @@ class View
         // 1. Strip comments: [-- ... --]
         $template = preg_replace('/\[--.*?--\]/s', '', $template);
 
-        // 2. Temporarily protect escaped brackets: @[[ ... ]] or @[{ ... }] or @{{ ... }}
+        // 2. Scan and compile output tags ([[ ]], [{ }], {{ }}) and escaped tags (@[[, @[{, @{{)
+        // Uses a character scanner tracking bracket depth and quotes to prevent premature truncation on nested array keys like [[ $a[$b[0]] ]]
         $escapedTokens = [];
-        $template = preg_replace_callback('/@(\[\[.*?\]\]|\[\{.*?\}\]|\{\{.*?\}\})/s', function ($m) use (&$escapedTokens) {
-            $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
-            $escapedTokens[$token] = $m[1]; // Store literal content without '@'
-            return $token;
-        }, $template);
-
-        // Support {{ ... }} as an alias for safe double brackets [[ ... ]]
-        $template = preg_replace('/\{\{\s*(.+?)\s*\}\}/s', '[[ $1 ]]', $template);
-
-        // 3. Raw / unescaped HTML output: [{ $expression }] (Srin standard)
-        $template = preg_replace('/\[\{\s*(.+?)\s*\}\]/s', '<?= $1 ?>', $template);
-
-        // 4. Double brackets safe output: [[ $expression ]] (Srin standard, supports nested brackets like $a[$b[0]])
-        $safeOutputPattern = '/\[\[\s*((?:[^\[\]"\']++|"[^"\\\\]*+(?:\\\\.[^"\\\\]*+)*+"|\'[^\'\\\\]*+(?:\\\\.[^\'\\\\]*+)*+\'|\[(?1)\])*)\s*\]\]/s';
-        $template = preg_replace_callback($safeOutputPattern, function ($m) {
-            $expr = trim($m[1]);
-            if ($expr === '') {
-                return '[[ ]]';
-            }
-            $expr = rtrim($expr, ';');
-            // Only raw HTML field generators are emitted without escaping;
-            // url(), route(), and asset() go through htmlspecialchars to prevent attribute breakout/XSS.
-            if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
-                return "<?= {$expr} ?>";
-            }
-            return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
-        }, $template);
+        $template = self::scanOutputTags($template, $escapedTokens);
 
         // 5. Standalone Directives: [csrf], [honeypot], [paginate], [include], [flash]
         // CSRF: [csrf]
