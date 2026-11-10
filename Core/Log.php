@@ -48,15 +48,24 @@ class Log
 
     /**
      * Write an entry to the log file.
+     * Enforces single-line sanitization to prevent log injection and log forging.
      */
     public static function write(string $level, string $message, array $context = []): void
     {
         $file = self::getLogFile();
         $timestamp = date('Y-m-d H:i:s');
-        $levelUpper = strtoupper(trim($level));
+        $levelUpper = strtoupper(Security::singleLine($level, 32));
+        $safeMessage = Security::singleLine($message, 5000);
 
-        $contextStr = !empty($context) ? ' ' . json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) : '';
-        $entry = "[{$timestamp}] {$levelUpper}: {$message}{$contextStr}" . PHP_EOL;
+        $contextStr = '';
+        if (!empty($context)) {
+            $encoded = json_encode($context, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            if ($encoded !== false) {
+                $contextStr = ' ' . Security::singleLine($encoded, 10000);
+            }
+        }
+
+        $entry = "[{$timestamp}] {$levelUpper}: {$safeMessage}{$contextStr}" . PHP_EOL;
 
         @file_put_contents($file, $entry, FILE_APPEND | LOCK_EX);
     }

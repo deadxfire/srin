@@ -232,26 +232,69 @@ class Security
     }
 
     /**
-     * Sanitize a string against null-byte poisoning, invisible control chars, and CRLF injection.
+     * Collapse control characters, line breaks (CR, LF, U+2028, U+2029, U+0085),
+     * and redundant whitespace into a single space, validate/sanitize UTF-8,
+     * and cap string length.
+     *
+     * Essential for single-line contexts like HTTP/mail headers and log messages.
      */
-    public static function cleanString(mixed $val, bool $stripNewlines = true): string
+    public static function singleLine(mixed $val, int $maxLength = 1000): string
+    {
+        if (!is_string($val)) {
+            $val = (string) $val;
+        }
+
+        // Sanitize invalid UTF-8 sequences to prevent regex failure
+        if (!mb_check_encoding($val, 'UTF-8')) {
+            $val = mb_convert_encoding($val, 'UTF-8', 'UTF-8');
+        }
+
+        // Replace ASCII control characters and Unicode line/paragraph separators with a space
+        $val = preg_replace('/[\x00-\x1F\x7F\x{0085}\x{2028}\x{2029}]+/u', ' ', $val);
+        if ($val === null) {
+            $val = '';
+        }
+
+        // Collapse multiple whitespace characters into a single space
+        $val = preg_replace('/\s+/u', ' ', $val);
+        if ($val === null) {
+            $val = '';
+        }
+
+        $val = trim($val);
+
+        if ($maxLength > 0 && mb_strlen($val, 'UTF-8') > $maxLength) {
+            $val = mb_substr($val, 0, $maxLength, 'UTF-8');
+        }
+
+        return $val;
+    }
+
+    /**
+     * Sanitize a string against null-byte poisoning and invisible control characters,
+     * while preserving newlines (CRLF) and tabs for multiline inputs (e.g. textareas).
+     * Safely handles invalid UTF-8 sequences to prevent regex failure.
+     */
+    public static function cleanString(mixed $val, bool $preserveNewlines = true): string
     {
         if (!is_string($val)) {
             $val = (string) $val;
         }
 
         // Sanitize invalid UTF-8 sequences to prevent preg_replace returning null & triggering deprecation
-        $val = mb_convert_encoding($val, 'UTF-8', 'UTF-8');
-
-        if ($stripNewlines) {
-            // Strip null bytes, invisible control chars, and CRLF
-            $val = preg_replace('/[\x00-\x1F\x7F]/u', '', $val);
-        } else {
-            // Strip null bytes and control chars (except normal tab, newline, carriage return)
-            $val = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $val);
+        if (!mb_check_encoding($val, 'UTF-8')) {
+            $val = mb_convert_encoding($val, 'UTF-8', 'UTF-8');
         }
 
-        return trim((string) $val);
+        if ($preserveNewlines) {
+            // Strip null bytes and control chars (except normal tab \t, newline \n, carriage return \r)
+            $cleaned = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $val);
+        } else {
+            // Strip null bytes, invisible control chars, and CRLF
+            $cleaned = preg_replace('/[\x00-\x1F\x7F]/u', '', $val);
+        }
+
+        return trim($cleaned ?? $val);
     }
 
     /**

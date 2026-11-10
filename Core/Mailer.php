@@ -27,27 +27,44 @@ class Mailer
     {
         $driver = config('mail.driver', 'log');
 
-        $to = $options['to'] ?? config('mail.admin_email');
-        $subject = $options['subject'] ?? 'Notification';
+        $to = Security::singleLine((string) ($options['to'] ?? config('mail.admin_email', '')));
+        $subject = Security::singleLine((string) ($options['subject'] ?? 'Notification'));
         $body = $options['body'] ?? ($options['message'] ?? '');
         $isHtml = $options['is_html'] ?? true;
-        $fromEmail = $options['from'] ?? config('mail.from.address', 'noreply@example.com');
-        $fromName = $options['from_name'] ?? config('mail.from.name', 'My Website');
+        $fromEmail = Security::singleLine((string) ($options['from'] ?? config('mail.from.address', 'noreply@example.com')));
+        $fromName = trim(str_replace(['<', '>', '"'], '', Security::singleLine((string) ($options['from_name'] ?? config('mail.from.name', 'My Website')))));
         $replyTo = $options['reply_to'] ?? null;
-        $replyName = $options['reply_name'] ?? '';
+        $replyName = trim(str_replace(['<', '>', '"'], '', Security::singleLine((string) ($options['reply_name'] ?? ''))));
 
-        if (empty($to)) {
-            return ['success' => false, 'message' => 'Recipient email (to) is required.'];
+        if (empty($to) || !filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Recipient email (to) is invalid or required.'];
+        }
+
+        if (empty($fromEmail) || !filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Sender email (from) is invalid.'];
+        }
+
+        if ($replyTo !== null && trim((string) $replyTo) !== '') {
+            $rawReplyTo = (string) $replyTo;
+            if (str_contains($rawReplyTo, "\r") || str_contains($rawReplyTo, "\n") || !filter_var(trim($rawReplyTo), FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Reply-to email is invalid.'];
+            }
+            $replyTo = Security::singleLine($rawReplyTo);
+            if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Reply-to email is invalid.'];
+            }
+        } else {
+            $replyTo = null;
         }
 
         // Driver: 'log' - for local testing without mail server
         if ($driver === 'log') {
-            return self::sendViaLog($to, $subject, $body, $fromEmail, $fromName, $replyTo);
+            return self::sendViaLog($to, $subject, $body, $fromEmail, $fromName, $replyTo, $replyName);
         }
 
         // Driver: 'mail' - native PHP mail()
         if ($driver === 'mail') {
-            return self::sendViaNativeMail($to, $subject, $body, $fromEmail, $fromName, $replyTo, $isHtml);
+            return self::sendViaNativeMail($to, $subject, $body, $fromEmail, $fromName, $replyTo, $isHtml, $replyName);
         }
 
         // Driver: 'smtp' - via Composer PHPMailer
@@ -56,7 +73,7 @@ class Mailer
         }
 
         // Fallback to native mail if PHPMailer class is not loaded
-        return self::sendViaNativeMail($to, $subject, $body, $fromEmail, $fromName, $replyTo, $isHtml);
+        return self::sendViaNativeMail($to, $subject, $body, $fromEmail, $fromName, $replyTo, $isHtml, $replyName);
     }
 
     /**
@@ -72,6 +89,32 @@ class Mailer
         string $replyName,
         bool $isHtml
     ): array {
+        $to        = Security::singleLine($to);
+        $fromEmail = Security::singleLine($fromEmail);
+        $fromName  = trim(str_replace(['<', '>', '"'], '', Security::singleLine($fromName)));
+        $subject   = Security::singleLine($subject);
+        $replyName = trim(str_replace(['<', '>', '"'], '', Security::singleLine($replyName)));
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid recipient email address (to).'];
+        }
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid sender email address (from).'];
+        }
+
+        if ($replyTo !== null && trim($replyTo) !== '') {
+            $rawReplyTo = (string) $replyTo;
+            if (str_contains($rawReplyTo, "\r") || str_contains($rawReplyTo, "\n") || !filter_var(trim($rawReplyTo), FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Reply-to email is invalid.'];
+            }
+            $replyTo = Security::singleLine($rawReplyTo);
+            if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Invalid reply-to email address.'];
+            }
+        } else {
+            $replyTo = null;
+        }
+
         $mail = new PHPMailer(true);
 
         try {
@@ -125,22 +168,43 @@ class Mailer
         string $fromEmail,
         string $fromName,
         ?string $replyTo,
-        bool $isHtml
+        bool $isHtml,
+        string $replyName = ''
     ): array {
-        // Sanitize header fields against CRLF injection / Bcc injection
-        $fromEmail = str_replace(["\r", "\n"], '', $fromEmail);
-        $fromName  = str_replace(["\r", "\n"], '', $fromName);
-        $to        = str_replace(["\r", "\n"], '', $to);
-        $subject   = str_replace(["\r", "\n"], '', $subject);
-        $replyTo   = $replyTo !== null ? str_replace(["\r", "\n"], '', $replyTo) : null;
+        // Sanitize and validate header fields against CRLF injection / Bcc injection
+        $to        = Security::singleLine($to);
+        $fromEmail = Security::singleLine($fromEmail);
+        $fromName  = trim(str_replace(['<', '>', '"'], '', Security::singleLine($fromName)));
+        $subject   = Security::singleLine($subject);
+        $replyName = trim(str_replace(['<', '>', '"'], '', Security::singleLine($replyName)));
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid recipient email address (to).'];
+        }
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid sender email address (from).'];
+        }
+
+        if ($replyTo !== null && trim($replyTo) !== '') {
+            $rawReplyTo = (string) $replyTo;
+            if (str_contains($rawReplyTo, "\r") || str_contains($rawReplyTo, "\n") || !filter_var(trim($rawReplyTo), FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Invalid reply-to email address.'];
+            }
+            $replyTo = Security::singleLine($rawReplyTo);
+            if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Invalid reply-to email address.'];
+            }
+        } else {
+            $replyTo = null;
+        }
 
         $headers = [];
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = $isHtml ? 'Content-type: text/html; charset=UTF-8' : 'Content-type: text/plain; charset=UTF-8';
-        $headers[] = "From: {$fromName} <{$fromEmail}>";
+        $headers[] = $fromName !== '' ? "From: {$fromName} <{$fromEmail}>" : "From: <{$fromEmail}>";
 
-        if ($replyTo) {
-            $headers[] = "Reply-To: {$replyTo}";
+        if ($replyTo !== null) {
+            $headers[] = $replyName !== '' ? "Reply-To: {$replyName} <{$replyTo}>" : "Reply-To: <{$replyTo}>";
         }
 
         $headers[] = 'X-Mailer: PHP/' . phpversion();
@@ -163,14 +227,35 @@ class Mailer
         string $body,
         string $fromEmail,
         string $fromName,
-        ?string $replyTo
+        ?string $replyTo,
+        string $replyName = ''
     ): array {
-        // Sanitize header values against log injection
-        $fromEmail = str_replace(["\r", "\n"], '', $fromEmail);
-        $fromName  = str_replace(["\r", "\n"], '', $fromName);
-        $to        = str_replace(["\r", "\n"], '', $to);
-        $subject   = str_replace(["\r", "\n"], '', $subject);
-        $replyTo   = $replyTo !== null ? str_replace(["\r", "\n"], '', $replyTo) : null;
+        // Sanitize and validate header values against log injection
+        $to        = Security::singleLine($to);
+        $fromEmail = Security::singleLine($fromEmail);
+        $fromName  = trim(str_replace(['<', '>', '"'], '', Security::singleLine($fromName)));
+        $subject   = Security::singleLine($subject);
+        $replyName = trim(str_replace(['<', '>', '"'], '', Security::singleLine($replyName)));
+
+        if (!filter_var($to, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid recipient email address (to).'];
+        }
+        if (!filter_var($fromEmail, FILTER_VALIDATE_EMAIL)) {
+            return ['success' => false, 'message' => 'Invalid sender email address (from).'];
+        }
+
+        if ($replyTo !== null && trim($replyTo) !== '') {
+            $rawReplyTo = (string) $replyTo;
+            if (str_contains($rawReplyTo, "\r") || str_contains($rawReplyTo, "\n") || !filter_var(trim($rawReplyTo), FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Invalid reply-to email address.'];
+            }
+            $replyTo = Security::singleLine($rawReplyTo);
+            if (!filter_var($replyTo, FILTER_VALIDATE_EMAIL)) {
+                return ['success' => false, 'message' => 'Invalid reply-to email address.'];
+            }
+        } else {
+            $replyTo = null;
+        }
 
         $logDir = dirname(__DIR__) . '/Others/logs';
         if (!is_dir($logDir)) {
@@ -181,12 +266,18 @@ class Mailer
         $timestamp = date('Y-m-d H:i:s');
         $divider = str_repeat('-', 50);
 
+        $fromDisplay = $fromName !== '' ? "{$fromName} <{$fromEmail}>" : "<{$fromEmail}>";
+        $replyDisplay = '';
+        if ($replyTo !== null) {
+            $replyDisplay = $replyName !== '' ? "{$replyName} <{$replyTo}>" : "<{$replyTo}>";
+        }
+
         $logEntry = <<<LOG
 {$divider}
 [{$timestamp}] MAIL DISPATCHED (LOG DRIVER)
 To: {$to}
-From: {$fromName} <{$fromEmail}>
-Reply-To: {$replyTo}
+From: {$fromDisplay}
+Reply-To: {$replyDisplay}
 Subject: {$subject}
 Body:
 {$body}
@@ -194,7 +285,7 @@ Body:
 
 LOG;
 
-        file_put_contents($logFile, $logEntry, FILE_APPEND);
+        file_put_contents($logFile, $logEntry, FILE_APPEND | LOCK_EX);
 
         return [
             'success' => true,
