@@ -599,12 +599,12 @@ class BaseController
             $this->rateLimit($throttleKey, $maxAttempts, $decaySeconds);
         }
 
-        // 2. Automated security verification on mutations (handles POST and spoofed PUT/PATCH/DELETE)
-        $isMutation = $this->isPost()
-            || in_array(Request::method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
-            || strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
-
-        if ($isMutation) {
+        // 2. Automated security verification on every state-changing request.
+        // IMPORTANT: use the REAL HTTP method. Request::method() honours the `_method`
+        // override, which would let a cross-site POST masquerade as PUT/PATCH/DELETE
+        // and skip these checks.
+        $realMethod = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+        if (!in_array($realMethod, ['GET', 'HEAD', 'OPTIONS'], true)) {
             $this->validateCsrf();
             $this->validateHoneypot();
         }
@@ -621,15 +621,13 @@ class BaseController
                 // Associative: 'title' => 'required|min:5' or 'slug' => ['required', 'min:3']
                 $allowedKeys[] = $key;
                 $rules[$key] = is_array($rule) ? implode('|', $rule) : (string) $rule;
+                // `confirmed` needs the matching "<field>_confirmation" input to be readable.
+                if (in_array('confirmed', explode('|', $rules[$key]), true)) {
+                    $allowedKeys[] = $key . '_confirmation';
+                }
             }
         }
 
-        // Auto-whitelist confirmation fields (e.g. password_confirmation for confirmed rule)
-        foreach ($rules as $field => $ruleString) {
-            if (str_contains($ruleString, 'confirmed')) {
-                $allowedKeys[] = $field . '_confirmation';
-            }
-        }
         $allowedKeys = array_values(array_unique($allowedKeys));
 
         // 4. Extract only allowed inputs (mass-assignment protection)
