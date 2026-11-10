@@ -266,7 +266,7 @@ class Router
     public static function getUrlByName(string $name, array|string|int $params = []): string
     {
         if (!isset(self::$namedRoutes[$name])) {
-            throw new Exception("Route with name [{$name}] is not defined in Routes/web.php.");
+            throw new Exception("Route with name [{$name}] is not defined in Routes/link.php.");
         }
 
         $path = self::$namedRoutes[$name]->getPath();

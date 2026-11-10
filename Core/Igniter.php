@@ -333,8 +333,11 @@ class Igniter
             $uri = Request::uri();
             self::trigger('request', $uri);
 
-            // Load web routes
-            $routesFile = dirname(__DIR__) . '/Routes/web.php';
+            // Load route links (prefer Routes/link.php, fallback to Routes/web.php)
+            $routesFile = dirname(__DIR__) . '/Routes/link.php';
+            if (!file_exists($routesFile)) {
+                $routesFile = dirname(__DIR__) . '/Routes/web.php';
+            }
             if (file_exists($routesFile)) {
                 require_once $routesFile;
             }

@@ -261,7 +261,7 @@ PHP;
     echo color("\n[✓] Controller created successfully!", 'green') . "\n";
     echo "  Location: " . color("Controller/{$cleanName}.php", 'cyan') . "\n";
 
-    echo color("\nNext Step: Register route link in Routes/web.php:\n", 'yellow');
+    echo color("\nNext Step: Register route link in Routes/link.php:\n", 'yellow');
     if ($hasMailFlag) {
         echo color("  getlink('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n", 'bold');
         echo color("  postlink('/{$baseName}', '{$cleanName}@sendMail')->name('{$baseName}.send');\n\n", 'bold');
@@ -760,9 +760,12 @@ function handleListRoutes(string $baseDir): void
     // Autoload routes
     require_once $baseDir . '/Others/autoload.php';
 
-    $routesFile = $baseDir . '/Routes/web.php';
+    $routesFile = $baseDir . '/Routes/link.php';
     if (!file_exists($routesFile)) {
-        echo color("\n[X] Routes/web.php file not found.\n\n", 'red');
+        $routesFile = $baseDir . '/Routes/web.php';
+    }
+    if (!file_exists($routesFile)) {
+        echo color("\n[X] Routes/link.php file not found.\n\n", 'red');
         return;
     }
 
@@ -771,7 +774,7 @@ function handleListRoutes(string $baseDir): void
     $routes = \Core\Router::getRoutes();
 
     if (empty($routes)) {
-        echo color("\nNo routes registered in Routes/web.php\n\n", 'yellow');
+        echo color("\nNo route links registered in Routes/link.php\n\n", 'yellow');
         return;
     }
 
@@ -1899,7 +1902,7 @@ function showHelp(): void
     echo "  " . color("make:layout <name>", 'green') . "          Create a master layout (name.srin.php)\n";
     echo "  " . color("make:partial <name>", 'green') . "         Create a reusable partial (Pages/partials/name.srin.php)\n";
     echo "  " . color("make:error <code>", 'green') . "           Create custom error page (Pages/errors/code.srin.php)\n";
-    echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/web.php\n";
+    echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/link.php\n";
     echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . " View application logs in terminal (live tail with -f)\n";
     echo "  " . color("clear:logs", 'green') . "                  Clear application and mail logs\n";
     echo "  " . color("key:generate", 'green') . "                Generate application 256-bit encryption key (APP_KEY)\n";

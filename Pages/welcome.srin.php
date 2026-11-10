@@ -181,7 +181,7 @@ assets/js/main.js
 assets/images/banner.jpg</code></pre>
                             </li>
                             <li>
-                                <strong>Connect the Route Link in <code>Routes/web.php</code>:</strong>
+                                <strong>Connect the Route Link in <code>Routes/link.php</code>:</strong>
                                 <pre><code>getlink('/', 'HomeController@index')->name('home');</code></pre>
                             </li>
                         </ol>
@@ -250,7 +250,7 @@ assets/images/banner.jpg</code></pre>
                             </div>
                             <div class="structure-item">
                                 <strong>Routes/</strong>
-                                <p>All URL routes are defined in <code>Routes/web.php</code> using clean <code>getlink()</code> and <code>postlink()</code> syntax (or <code>Link::get()</code>).</p>
+                                <p>All URL routes are defined in <code>Routes/link.php</code> using clean <code>getlink()</code> and <code>postlink()</code> syntax (or <code>Link::get()</code>).</p>
                             </div>
                             <div class="structure-item">
                                 <strong>Others/</strong>
@@ -1321,7 +1321,7 @@ class ArticleController extends BaseController
                                     <tr>
                                         <td><code>route('name', \$params)</code></td>
                                         <td><code>@[[ route('posts.show', ['slug' =&gt; 'hi']) ]]</code></td>
-                                        <td>Generates URL for a named route from <code>Routes/web.php</code>.</td>
+                                        <td>Generates URL for a named route from <code>Routes/link.php</code>.</td>
                                     </tr>
                                     <tr>
                                         <td><code>url('/path')</code></td>
@@ -1370,8 +1370,8 @@ class ArticleController extends BaseController
 
                     <!-- 8. Defining Routes -->
                     <section id="routing" class="doc-card">
-                        <h2>8. Defining Routes &amp; Route Links (<code>Routes/web.php</code>)</h2>
-                        <p>Register all link paths in <code>Routes/web.php</code> using Srin link functions or <code>Link::get()</code> and assign names using <code>-&gt;name('name')</code>:</p>
+                        <h2>8. Defining Routes &amp; Route Links (<code>Routes/link.php</code>)</h2>
+                        <p>Register all link paths in <code>Routes/link.php</code> using Srin link functions or <code>Link::get()</code> and assign names using <code>-&gt;name('name')</code>:</p>
                         <pre><code>use Core\Link;
 
 // Define named route links:
