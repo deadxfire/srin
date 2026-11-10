@@ -14,24 +14,41 @@ define('SRIN_START', microtime(true));
 
 // Protect against direct file execution / probing when using PHP's built-in server (php srin serve)
 if (php_sapi_name() === 'cli-server') {
-    $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
-    $targetFile = realpath(__DIR__ . $uriPath);
+    $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?? '/';
+    $decodedUri = rawurldecode($uriPath);
 
-    if ($targetFile && is_file($targetFile)) {
+    // Reject traversal sequences and NUL bytes outright
+    if (!str_contains($uriPath, "\0") && !str_contains($uriPath, '..') &&
+        !str_contains($decodedUri, "\0") && !str_contains($decodedUri, '..')) {
         $realAssets = realpath(__DIR__ . '/assets');
+        $targetFile = realpath(__DIR__ . $uriPath);
 
-        // Only allow direct static streaming if the file resides STRICTLY inside the assets/ directory
-        if ($realAssets && str_starts_with($targetFile, $realAssets . DIRECTORY_SEPARATOR)) {
-            // Never serve PHP files directly from assets/
-            $ext = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
-            if (!in_array($ext, ['php', 'phtml', 'phar', 'htaccess'], true)) {
-                return false; // Valid asset file -> let PHP CLI server stream it directly
+        if ($realAssets && $targetFile && is_file($targetFile)) {
+            // Only allow direct static streaming if the file resides STRICTLY inside the assets/ directory
+            if (str_starts_with($targetFile, $realAssets . DIRECTORY_SEPARATOR)) {
+                $relative = substr($targetFile, strlen($realAssets . DIRECTORY_SEPARATOR));
+                $segments = explode(DIRECTORY_SEPARATOR, $relative);
+                $hasDotSegment = false;
+                foreach ($segments as $seg) {
+                    if (str_starts_with($seg, '.')) {
+                        $hasDotSegment = true;
+                        break;
+                    }
+                }
+
+                $ext = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
+                $blockedExts = ['php', 'phtml', 'phar', 'php3', 'php4', 'php5', 'php7', 'php8', 'phps', 'pht', 'htaccess'];
+
+                // Refuse dotfiles and PHP/executable files
+                if (!$hasDotSegment && !in_array($ext, $blockedExts, true)) {
+                    return false; // Valid asset file -> let PHP CLI server stream it directly
+                }
             }
         }
-
-        // For non-asset files (e.g. /core/App.php, /Config/mail.php, /Pages/...), do NOT return false.
-        // Let execution fall through to \Core\App::run(), where Router dispatches it as an unmapped route and renders 404!
     }
+
+    // For non-asset files (e.g. /assets-private/secret.txt, /Core/App.php, /Config/mail.php, /Pages/...), do NOT return false.
+    // Let execution fall through to \Core\App::run(), where Router dispatches it as an unmapped route and renders 404!
 }
 
 // 1. Composer Autoloader (packages located in Others/)

@@ -93,10 +93,15 @@ class Response
      */
     public static function download(string $assetPath, ?string $downloadName = null): void
     {
-        // 1. Recursively strip traversal sequences and normalize slashes
-        do {
-            $assetPath = str_replace(['../', '..\\'], '', $assetPath, $count);
-        } while ($count > 0);
+        // Reject traversal sequences and NUL bytes outright
+        $decoded = rawurldecode($assetPath);
+        if (
+            str_contains($assetPath, "\0") || str_contains($assetPath, '..') ||
+            str_contains($decoded, "\0") || str_contains($decoded, '..')
+        ) {
+            self::renderError(404, "Downloadable file not found.");
+            exit;
+        }
 
         $clean = ltrim(str_replace(['\\', '/'], '/', $assetPath), '/');
         if (str_starts_with($clean, 'assets/')) {
@@ -133,12 +138,19 @@ class Response
             ob_end_clean();
         }
 
-        $filename = $downloadName ?: basename($targetPath);
+        $filename = ($downloadName !== null && $downloadName !== '') ? $downloadName : basename($targetPath);
+        $filename = str_replace(["\r", "\n", "\0", '/', '\\', '"', "'"], '', $filename);
+        $filename = trim($filename);
+        if ($filename === '') {
+            $filename = basename($targetPath);
+            $filename = str_replace(["\r", "\n", "\0", '/', '\\', '"', "'"], '', $filename);
+        }
+
         $mimeType = mime_content_type($targetPath) ?: 'application/octet-stream';
 
         header('Content-Description: File Transfer');
         header('Content-Type: ' . $mimeType);
-        header('Content-Disposition: attachment; filename="' . str_replace('"', '', $filename) . '"');
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('Content-Transfer-Encoding: binary');
         header('Expires: 0');
         header('Cache-Control: must-revalidate, post-check=0, pre-check=0');
