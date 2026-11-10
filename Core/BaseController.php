@@ -181,66 +181,99 @@ class BaseController
      * Generates a collision-resistant filename and validates extensions.
      * Returns the relative path on success, or null on failure.
      */
-    protected function storeFile(string $key, string $destinationDir = 'assets/uploads', array $allowedExtensions = []): ?string
+    protected function storeFile(string $key, string $destinationDir = 'assets/uploads', array $allowedExtensions = [], ?int $maxBytes = null): ?string
     {
         if (!$this->hasFile($key)) {
             return null;
         }
 
         $file = $this->file($key);
+        if (!is_array($file) || !isset($file['tmp_name']) || !is_string($file['tmp_name'])) {
+            return null;
+        }
+
         $originalName = (string) ($file['name'] ?? '');
         $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
-        // Always block dangerous executable scripts
-        $blockedExtensions = [
-            'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'phps', 'pht',
-            'inc', 'cgi', 'pl', 'exe', 'sh', 'bash', 'bat', 'cmd', 'htaccess', 'htpasswd', 'config'
+        // Extensions that must never be stored, even if the caller allows them
+        // (server-side code, handlers/config overrides, and script-bearing formats).
+        $forbidden = [
+            'php', 'php2', 'php3', 'php4', 'php5', 'php6', 'php7', 'php8', 'phtml', 'pht', 'phps', 'phar',
+            'inc', 'cgi', 'pl', 'py', 'rb', 'sh', 'bash', 'asp', 'aspx', 'jsp', 'exe', 'dll', 'bat', 'cmd',
+            'htaccess', 'htpasswd', 'ini', 'user', 'shtml', 'html', 'htm', 'xhtml', 'svg', 'js', 'mjs',
         ];
-        if ($ext === '' || in_array($ext, $blockedExtensions, true)) {
-            return null;
+
+        // Check EVERY dot-separated part of the client name (e.g. "shell.php.jpg").
+        foreach (explode('.', strtolower(basename($originalName))) as $part) {
+            if (in_array($part, $forbidden, true)) {
+                return null;
+            }
         }
 
-        // Safe default allowed extensions when none explicitly configured
-        $defaultAllowed = [
-            'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico',
-            'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
-            'zip', 'rar', 'tar', 'gz', 'mp3', 'wav', 'mp4', 'webm'
-        ];
-
+        // Safe default allowlist when the caller does not supply one.
         $allowed = !empty($allowedExtensions)
             ? array_map('strtolower', $allowedExtensions)
-            : $defaultAllowed;
+            : ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'txt', 'csv'];
+        $allowed = array_values(array_diff($allowed, $forbidden));
 
-        if (!in_array($ext, $allowed, true)) {
+        if ($ext === '' || !in_array($ext, $allowed, true)) {
             return null;
         }
 
-        $baseDir = dirname(__DIR__);
-        // Recursively strip directory traversal sequences
-        do {
-            $destinationDir = str_replace(['../', '..\\'], '', $destinationDir, $count);
-        } while ($count > 0);
-
-        $cleanDir = trim(str_replace(['\\', '/'], '/', $destinationDir), '/');
-        // Prevent leading/trailing dot shenanigans
-        $cleanDir = preg_replace('#^(\.+/)+#', '', $cleanDir);
-        $targetPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $cleanDir);
-
-        if (!is_dir($targetPath)) {
-            mkdir($targetPath, 0755, true);
+        // Size limit.
+        $limit = $maxBytes ?? (int) config('app.upload_max_bytes', 5 * 1024 * 1024);
+        $size = (int) ($file['size'] ?? 0);
+        if ($size <= 0 || $size > $limit) {
+            return null;
         }
 
-        // Ensure .htaccess disables PHP script execution inside upload directory
-        $htaccessPath = $targetPath . DIRECTORY_SEPARATOR . '.htaccess';
-        if (!file_exists($htaccessPath)) {
-            @file_put_contents($htaccessPath, "<FilesMatch \"\\.(php[0-9]?|phtml|phar|phps)$\">\n    Order Deny,Allow\n    Deny from all\n</FilesMatch>\nphp_flag engine off\n");
+        if (!is_uploaded_file($file['tmp_name'])) {
+            return null;
+        }
+
+        // Content must match the claimed type for images.
+        if (in_array($ext, ['jpg', 'jpeg', 'png', 'gif', 'webp'], true)
+            && @getimagesize($file['tmp_name']) === false) {
+            return null;
+        }
+
+        // Destination: reject any traversal segment outright (no "clean up and continue").
+        $baseDir = realpath(dirname(__DIR__));
+        $normalized = trim(str_replace('\\', '/', $destinationDir), '/');
+        foreach (explode('/', $normalized) as $segment) {
+            if ($segment === '' || $segment === '.' || $segment === '..') {
+                return null;
+            }
+        }
+        $targetPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $normalized);
+
+        if (!is_dir($targetPath) && !mkdir($targetPath, 0755, true) && !is_dir($targetPath)) {
+            return null;
+        }
+
+        $realTarget = realpath($targetPath);
+        if ($realTarget === false || !str_starts_with($realTarget . DIRECTORY_SEPARATOR, $baseDir . DIRECTORY_SEPARATOR)) {
+            return null;
+        }
+
+        // Defence in depth: make sure the upload directory can never execute scripts.
+        $guard = $realTarget . DIRECTORY_SEPARATOR . '.htaccess';
+        if (!file_exists($guard)) {
+            @file_put_contents($guard, "# Auto-generated: uploads must never execute\n"
+                . "<IfModule mod_php.c>\n    php_flag engine off\n</IfModule>\n"
+                . "<FilesMatch \"(?i)\\.(php[0-9s]?|phtml|phar|pht|cgi|pl|py|sh)$\">\n"
+                . "    Require all denied\n</FilesMatch>\n"
+                . "Options -ExecCGI -Indexes\n"
+                . "RemoveHandler .php .phtml .phar\n"
+                . "Header set X-Content-Type-Options \"nosniff\"\n");
         }
 
         $safeName = bin2hex(random_bytes(16)) . '.' . $ext;
-        $destination = $targetPath . DIRECTORY_SEPARATOR . $safeName;
+        $destination = $realTarget . DIRECTORY_SEPARATOR . $safeName;
 
         if (move_uploaded_file($file['tmp_name'], $destination)) {
-            return $cleanDir . '/' . $safeName;
+            @chmod($destination, 0644);
+            return $normalized . '/' . $safeName;
         }
 
         return null;
