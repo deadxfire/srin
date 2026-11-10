@@ -353,7 +353,7 @@ class Response
                 <p class="error-desc">{$safeMsg}</p>
                 <a href="{$homeUrl}" class="btn-home">&larr; Return to Home</a>
                 <div class="hint-box">
-                    💡 <strong>Custom Design:</strong> Create <code>Pages/errors/{$code}.srin.php</code> (or run <code>php srin make:error {$code}</code>) to automatically customize this error page.
+                    💡 <strong>Custom Design:</strong> Create <code>Pages/errors/{$code}.srin.php</code> (or run <code>srin add error {$code}</code>) to automatically customize this error page.
                 </div>
                 <div class="developer-credit">
                     Srin Engine &bull; Developed by <strong><a href="https://github.com/deadxfire" target="_blank" style="color: inherit; text-decoration: underline;">Arindam Makar</a></strong>

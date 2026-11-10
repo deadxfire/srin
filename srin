@@ -36,28 +36,102 @@ function color(string $text, string $color): string {
 }
 
 switch ($command) {
+    // -------------------------------------------------------------------------
+    // Srin "add" Command: srin add <type> <name>
+    // -------------------------------------------------------------------------
+    case 'add':
+    case 'create':
+    case 'new':
+        $sub = strtolower($arguments[1] ?? '');
+        $subArgs = array_slice($arguments, 1);
+        switch ($sub) {
+            case 'controller':
+                handleMakeController($subArgs, $baseDir);
+                break;
+
+            case 'checkpoint':
+            case 'gate':
+                handleMakeCheckpoint($subArgs, $baseDir);
+                break;
+
+            case 'model':
+                handleMakeModel($subArgs, $baseDir);
+                break;
+
+            case 'migration':
+                handleMakeMigration($subArgs, $baseDir);
+                break;
+
+            case 'seeder':
+                handleMakeSeeder($subArgs, $baseDir);
+                break;
+
+            case 'page':
+                handleMakePage($subArgs, $baseDir);
+                break;
+
+            case 'layout':
+                handleMakeLayout($subArgs, $baseDir);
+                break;
+
+            case 'partial':
+            case 'component':
+                handleMakePartial($subArgs, $baseDir);
+                break;
+
+            case 'error':
+                handleMakeError($subArgs, $baseDir);
+                break;
+
+            default:
+                echo color("\n[!] Please specify what to add: controller, model, migration, checkpoint, seeder, page, layout, partial, or error.\n", 'yellow');
+                echo "Example: srin add controller About\n\n";
+                break;
+        }
+        break;
+
+    // Direct / legacy aliases for controllers
+    case 'controller':
     case 'make:controller':
         handleMakeController($arguments, $baseDir);
         break;
 
+    // Direct / legacy aliases for checkpoints
+    case 'checkpoint':
+    case 'gate':
     case 'make:checkpoint':
     case 'make:gate':
         handleMakeCheckpoint($arguments, $baseDir);
         break;
 
+    // Direct / legacy aliases for models
+    case 'model':
     case 'make:model':
         handleMakeModel($arguments, $baseDir);
         break;
 
+    // Direct / legacy aliases for migrations
+    case 'migration':
     case 'make:migration':
         handleMakeMigration($arguments, $baseDir);
         break;
 
+    // Database migrations
     case 'migrate':
-        handleMigrate($baseDir);
+        $sub = strtolower($arguments[1] ?? '');
+        if ($sub === 'fresh') {
+            handleMigrateFresh(array_slice($arguments, 1), $baseDir);
+        } elseif ($sub === 'rollback') {
+            handleMigrateRollback($baseDir);
+        } elseif ($sub === 'status') {
+            handleMigrateStatus($baseDir);
+        } else {
+            handleMigrate($baseDir);
+        }
         break;
 
     case 'migrate:rollback':
+    case 'rollback':
         handleMigrateRollback($baseDir);
         break;
 
@@ -69,6 +143,8 @@ switch ($command) {
         handleMigrateFresh($arguments, $baseDir);
         break;
 
+    // Database seeders
+    case 'seeder':
     case 'make:seeder':
         handleMakeSeeder($arguments, $baseDir);
         break;
@@ -78,52 +154,93 @@ switch ($command) {
         handleDbSeed($arguments, $baseDir);
         break;
 
+    // Views, pages, layouts, partials
+    case 'page':
     case 'make:page':
         handleMakePage($arguments, $baseDir);
         break;
 
+    case 'layout':
     case 'make:layout':
         handleMakeLayout($arguments, $baseDir);
         break;
 
+    case 'partial':
+    case 'component':
     case 'make:partial':
     case 'make:component':
         handleMakePartial($arguments, $baseDir);
         break;
 
+    case 'error':
     case 'make:error':
         handleMakeError($arguments, $baseDir);
         break;
 
+    // Route links inspection
+    case 'links':
+    case 'link':
     case 'routes':
     case 'route:list':
         handleListRoutes($baseDir);
         break;
 
+    // Real-time logs
     case 'logs':
     case 'log':
         handleLogs($arguments, $baseDir);
+        break;
+
+    // Cache / Log clearing
+    case 'clear':
+        $sub = strtolower($arguments[1] ?? '');
+        if ($sub === 'logs' || $sub === 'log') {
+            handleClearLogs($baseDir);
+        } elseif ($sub === 'views' || $sub === 'view' || $sub === 'cache') {
+            require_once $baseDir . '/Others/autoload.php';
+            \Core\View::clearCache();
+            echo color("\n[✓] Compiled view cache cleared successfully!\n\n", 'green');
+        } else {
+            echo color("\n[!] Please specify what to clear: 'logs' or 'cache'.\n", 'yellow');
+            echo "Example: srin clear logs\n\n";
+        }
         break;
 
     case 'clear:logs':
         handleClearLogs($baseDir);
         break;
 
+    // Security encryption key
+    case 'key':
+        $sub = strtolower($arguments[1] ?? '');
+        if ($sub === 'generate') {
+            handleKeyGenerate(array_slice($arguments, 1), $baseDir);
+        } else {
+            handleKeyGenerate($arguments, $baseDir);
+        }
+        break;
+
     case 'key:generate':
         handleKeyGenerate($arguments, $baseDir);
         break;
 
+    // Local dev server
+    case 'dev':
     case 'serve':
+    case 'up':
+    case 'run':
         handleServe($arguments);
         break;
 
+    // Self-updater
     case 'upgrade':
     case 'update':
         handleUpgrade($arguments, $baseDir);
         break;
 
     case 'help':
-    case 'list':
+    case '--help':
+    case '-h':
     default:
         showHelp();
         break;
@@ -139,8 +256,9 @@ function handleMakeController(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a controller name.\n", 'yellow');
-        echo "Usage: php srin make:controller <Name> [--mail]\n";
-        echo "Example: php srin make:controller ContactController --mail\n\n";
+        echo "Usage: srin add controller <Name> [--mail]\n";
+        echo "Example: srin add controller About\n";
+        echo "         srin add controller Contact --mail\n\n";
         return;
     }
 
@@ -279,8 +397,8 @@ function handleMakeCheckpoint(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a checkpoint name.\n", 'yellow');
-        echo "Usage: php srin make:checkpoint <Name>\n";
-        echo "Example: php srin make:checkpoint VerifySubscription\n\n";
+        echo "Usage: srin add checkpoint <Name>\n";
+        echo "Example: srin add checkpoint VerifySubscription\n\n";
         return;
     }
 
@@ -353,8 +471,8 @@ function handleMakePage(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a page name.\n", 'yellow');
-        echo "Usage: php srin make:page <name>\n";
-        echo "Example: php srin make:page about\n\n";
+        echo "Usage: srin add page <name>\n";
+        echo "Example: srin add page about\n\n";
         return;
     }
 
@@ -481,8 +599,8 @@ function handleMakeLayout(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a layout name.\n", 'yellow');
-        echo "Usage: php srin make:layout <name>\n";
-        echo "Example: php srin make:layout admin\n\n";
+        echo "Usage: srin add layout <name>\n";
+        echo "Example: srin add layout admin\n\n";
         return;
     }
 
@@ -560,9 +678,9 @@ function handleMakePartial(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a partial name.\n", 'yellow');
-        echo "Usage: php srin make:partial <name>\n";
-        echo "Example: php srin make:partial navbar\n";
-        echo "         php srin make:partial components.card\n\n";
+        echo "Usage: srin add partial <name>\n";
+        echo "Example: srin add partial navbar\n";
+        echo "         srin add partial components.card\n\n";
         return;
     }
 
@@ -615,7 +733,7 @@ function handleMakeError(array $args, string $baseDir): void
 
     if (!$code) {
         echo color("\n[!] Error: Please provide an HTTP error number (e.g. 404, 500, 403).\n", 'red');
-        echo "Example: " . color("php srin make:error 404\n\n", 'yellow');
+        echo "Example: " . color("srin add error 404\n\n", 'yellow');
         exit(1);
     }
 
@@ -975,8 +1093,8 @@ function handleMakeModel(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a model name.\n", 'yellow');
-        echo "Usage: php srin make:model <Name> [-m|--migration]\n";
-        echo "Example: php srin make:model Post -m\n\n";
+        echo "Usage: srin add model <Name> [-m|--migration]\n";
+        echo "Example: srin add model Post -m\n\n";
         return;
     }
 
@@ -1061,8 +1179,8 @@ function handleMakeMigration(array $args, string $baseDir, ?string $targetTable 
 
     if (!$name) {
         echo color("\n[!] Please specify a migration name.\n", 'yellow');
-        echo "Usage: php srin make:migration <name>\n";
-        echo "Example: php srin make:migration create_posts_table\n\n";
+        echo "Usage: srin add migration <name>\n";
+        echo "Example: srin add migration create_posts_table\n\n";
         return;
     }
 
@@ -1256,8 +1374,8 @@ function handleMakeSeeder(array $args, string $baseDir): void
 
     if (!$name) {
         echo color("\n[!] Please specify a seeder name.\n", 'yellow');
-        echo "Usage: php srin make:seeder <Name>\n";
-        echo "Example: php srin make:seeder UserSeeder\n\n";
+        echo "Usage: srin add seeder <Name>\n";
+        echo "Example: srin add seeder UserSeeder\n\n";
         return;
     }
 
@@ -1886,39 +2004,44 @@ function showHelp(): void
     echo color("========================================================\n", 'cyan');
     echo "A simple, lightweight generator for your static site in Core PHP.\n\n";
 
-    echo color("AVAILABLE COMMANDS:\n", 'yellow');
-    echo "  " . color("make:controller <Name>", 'green') . "      Create a new controller in Controller/\n";
-    echo "  " . color("make:controller <Name> --mail", 'green') . " Create a controller with mail transfer methods\n";
-    echo "  " . color("make:checkpoint <Name>", 'green') . "      Create a request checkpoint (gate) in Checkpoint/\n";
-    echo "  " . color("make:model <Name> [-m]", 'green') . "         Create a model in Model/ (and migration with -m)\n";
-    echo "  " . color("make:migration <name>", 'green') . "          Create a migration in database/migrations/\n";
-    echo "  " . color("migrate", 'green') . "                        Run all pending database migrations\n";
-    echo "  " . color("migrate:rollback", 'green') . "               Rollback the last batch of migrations\n";
-    echo "  " . color("migrate:status", 'green') . "                 View migration status table\n";
-    echo "  " . color("migrate:fresh [--seed]", 'green') . "         Drop all tables and re-run all migrations (optional: seed)\n";
-    echo "  " . color("make:seeder <Name>", 'green') . "             Create a database seeder in database/seeders/\n";
-    echo "  " . color("db:seed [--class=Name]", 'green') . "         Run database seeders (default: DatabaseSeeder)\n";
-    echo "  " . color("make:page <name>", 'green') . "            Create a new frontend page (name.srin.php)\n";
-    echo "  " . color("make:layout <name>", 'green') . "          Create a master layout (name.srin.php)\n";
-    echo "  " . color("make:partial <name>", 'green') . "         Create a reusable partial (Pages/partials/name.srin.php)\n";
-    echo "  " . color("make:error <code>", 'green') . "           Create custom error page (Pages/errors/code.srin.php)\n";
-    echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/link.php\n";
-    echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . " View application logs in terminal (live tail with -f)\n";
-    echo "  " . color("clear:logs", 'green') . "                  Clear application and mail logs\n";
-    echo "  " . color("key:generate", 'green') . "                Generate application 256-bit encryption key (APP_KEY)\n";
-    echo "  " . color("serve [--port=8000]", 'green') . "         Start PHP's built-in development server\n";
-    echo "  " . color("upgrade [--force] [--check]", 'green') . " Upgrade Srin Engine to latest release with overwrite\n";
-    echo "  " . color("help", 'green') . "                        Display this help screen\n\n";
+    echo color("SCAFFOLDING (srin add <type> <name>):\n", 'yellow');
+    echo "  " . color("add controller <Name> [--mail]", 'green') . "   Add a controller in Controller/\n";
+    echo "  " . color("add model <Name> [-m]", 'green') . "            Add a model in Model/ (and migration with -m)\n";
+    echo "  " . color("add migration <name>", 'green') . "             Add a migration in database/migrations/\n";
+    echo "  " . color("add checkpoint <Name>", 'green') . "            Add a request checkpoint (gate) in Checkpoint/\n";
+    echo "  " . color("add seeder <Name>", 'green') . "                Add a database seeder in database/seeders/\n";
+    echo "  " . color("add page <name>", 'green') . "                  Add a frontend page (Pages/name.srin.php)\n";
+    echo "  " . color("add layout <name>", 'green') . "                Add a master layout (Pages/layouts/name.srin.php)\n";
+    echo "  " . color("add partial <name>", 'green') . "               Add a reusable partial (Pages/partials/name.srin.php)\n";
+    echo "  " . color("add error <code>", 'green') . "                 Add a custom error page (Pages/errors/code.srin.php)\n\n";
+
+    echo color("DATABASE COMMANDS:\n", 'yellow');
+    echo "  " . color("migrate", 'green') . "                          Run all pending database migrations\n";
+    echo "  " . color("migrate fresh [--seed]", 'green') . "           Drop all tables & re-run all migrations\n";
+    echo "  " . color("migrate rollback", 'green') . "                 Rollback the last batch of migrations\n";
+    echo "  " . color("migrate status", 'green') . "                   View database migration status table\n";
+    echo "  " . color("seed [--class=Name]", 'green') . "              Run database seeders (default: DatabaseSeeder)\n\n";
+
+    echo color("APPLICATION COMMANDS:\n", 'yellow');
+    echo "  " . color("links", 'green') . "                            List all registered route links from Routes/link.php\n";
+    echo "  " . color("dev [--port=8000]", 'green') . "                Start local PHP development server\n";
+    echo "  " . color("key [--force]", 'green') . "                    Generate application 256-bit encryption key (APP_KEY)\n";
+    echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . "   View application logs in terminal (live tail with -f)\n";
+    echo "  " . color("clear logs", 'green') . "                       Clear application and mail logs\n";
+    echo "  " . color("clear cache", 'green') . "                      Clear compiled template view cache\n";
+    echo "  " . color("upgrade [--force] [--check]", 'green') . "      Upgrade Srin Engine to latest release\n";
+    echo "  " . color("help", 'green') . "                             Display this help screen\n\n";
 
     echo color("EXAMPLES:\n", 'yellow');
-    echo "  php srin make:model Post -m\n";
-    echo "  php srin make:migration create_inquiries_table\n";
-    echo "  php srin migrate\n";
-    echo "  php srin migrate:status\n";
-    echo "  php srin make:controller HomeController\n";
-    echo "  php srin make:page home\n";
-    echo "  php srin upgrade\n";
-    echo "  php srin upgrade --force\n";
-    echo "  php srin serve\n\n";
+    echo "  srin add controller About\n";
+    echo "  srin add controller Contact --mail\n";
+    echo "  srin add model Post -m\n";
+    echo "  srin add migration create_inquiries_table\n";
+    echo "  srin add checkpoint AuthGate\n";
+    echo "  srin add page about\n";
+    echo "  srin links\n";
+    echo "  srin dev\n";
+    echo "  srin migrate\n";
+    echo "  srin migrate status\n\n";
 }
 

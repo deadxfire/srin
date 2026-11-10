@@ -317,41 +317,41 @@ php srin serve --port=8080
 
 # 2. Application Logging (Terminal Log Viewer)
 php srin logs                        # View latest application log entries
-php srin logs -f                     # Live stream / tail logs in real-time (Ctrl+C to stop)
-php srin logs --lines=50             # View last 50 log lines
-php srin logs --mail                 # View mail delivery log
-php srin clear:logs                  # Clear all log files in Others/logs/
+srin logs -f                     # Live stream / tail logs in real-time (Ctrl+C to stop)
+srin logs --lines=50             # View last 50 log lines
+srin logs --mail                 # View mail delivery log
+srin clear logs                  # Clear all log files in Others/logs/
 
 # 3. Request Checkpoints (Linear Middleware Gates)
-php srin make:checkpoint VerifySubscription # Scaffolds Checkpoint/VerifySubscriptionCheckpoint.php
+srin add checkpoint VerifySubscription # Scaffolds Checkpoint/VerifySubscriptionCheckpoint.php
 
 # 4. Database Models & Migrations
-php srin make:model Post -m          # Create Model/Post.php AND a migration
-php srin make:model Inquiry          # Create Model/Inquiry.php only
-php srin make:migration add_views    # Create a new migration file
-php srin migrate                     # Run all pending migrations
-php srin migrate:rollback            # Rollback the last migration batch
-php srin migrate:status              # Show migration status table
-php srin migrate:fresh               # Drop all tables and re-run migrations
+srin add model Post -m          # Create Model/Post.php AND a migration
+srin add model Inquiry          # Create Model/Inquiry.php only
+srin add migration add_views    # Create a new migration file
+srin migrate                    # Run all pending migrations
+srin migrate rollback           # Rollback the last migration batch
+srin migrate status             # Show migration status table
+srin migrate fresh              # Drop all tables and re-run migrations
 
 # 5. Create a standard controller
-php srin make:controller HomeController
+srin add controller Home
 
 # 6. Create a controller with mail transfer
-php srin make:controller ContactController --mail
+srin add controller Contact --mail
 
 # 7. Create a new frontend page (.srin.php)
-php srin make:page portfolio
+srin add page portfolio
 
 # 8. Create a master layout
-php srin make:layout admin
+srin add layout admin
 
 # 9. Create a custom error page (e.g., 403, 404, 500)
-php srin make:error 404
-php srin make:error 500
+srin add error 404
+srin add error 500
 
-# 10. List all registered routes
-php srin routes
+# 10. List all registered route links
+srin links
 ```
 
 ---
@@ -389,10 +389,10 @@ DB_DATABASE="database/database.sqlite"
 
 ### 2. Creating Models & Migrations
 
-Use `php srin make:model <Name> -m` to generate both the model and its corresponding table migration in one step:
+Use `srin add model <Name> -m` to generate both the model and its corresponding table migration in one step:
 
 ```bash
-php srin make:model Article -m
+srin add model Article -m
 ```
 
 This generates:
@@ -957,7 +957,7 @@ Simply create a `.srin.php` file named with the HTTP status code inside `Pages/e
 
 Or generate one instantly:
 ```bash
-php srin make:error 404
+srin add error 404
 ```
 
 In your code, abort anytime:
@@ -976,7 +976,7 @@ Configured in `Config/mail.php` with `.env` support:
 
 ### Generating a Controller with Mail Pre-Wired:
 ```bash
-php srin make:controller ContactController --mail
+srin add controller Contact --mail
 ```
 
 ---
@@ -1120,7 +1120,7 @@ grouplink(['prefix' => '/portal', 'checkpoint' => 'auth'], function () {
 
 ### 4. Scaffolding Checkpoints via CLI
 ```bash
-php srin make:checkpoint VerifySubscription
+srin add checkpoint VerifySubscription
 ```
 
 ---

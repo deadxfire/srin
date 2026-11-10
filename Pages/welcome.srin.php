@@ -162,17 +162,17 @@ composer create-project deadxfire/srin my-website</code></pre>
                         <ol class="step-list">
                             <li>
                                 <strong>Start local development server:</strong>
-                                <pre><code>php srin serve
+                                <pre><code>srin dev
 # or
 php -S localhost:8000 index.php</code></pre>
                             </li>
                             <li>
                                 <strong>Create your first Controller:</strong>
-                                <pre><code>php srin make:controller HomeController</code></pre>
+                                <pre><code>srin add controller Home</code></pre>
                             </li>
                             <li>
                                 <strong>Create your first Page (generates <code>Pages/home.srin.php</code>):</strong>
-                                <pre><code>php srin make:page home</code></pre>
+                                <pre><code>srin add page home</code></pre>
                             </li>
                             <li>
                                 <strong>Add your custom CSS or JS in <code>assets/</code>:</strong>
@@ -265,44 +265,44 @@ assets/images/banner.jpg</code></pre>
                         <p>Use the built-in Srin CLI tool (<code>srin</code> or <code>php srin</code>) to generate models, migrations, controllers, pages, layouts, and error pages:</p>
 
                         <h3>Generate Model with Migration</h3>
-                        <pre><code>php srin make:model Post -m</code></pre>
+                        <pre><code>srin add model Post -m</code></pre>
                         <p>Generates <code>Model/Post.php</code> and a matching migration file in <code>database/migrations/</code>.</p>
 
                         <h3>Database Migrations</h3>
-                        <pre><code>php srin migrate           # Run pending migrations
-php srin migrate:status    # View status of migrations
-php srin migrate:rollback  # Rollback last migration batch
-php srin migrate:fresh     # Drop all tables and re-run all migrations</code></pre>
+                        <pre><code>srin migrate          # Run pending migrations
+srin migrate status   # View status of migrations
+srin migrate rollback # Rollback last migration batch
+srin migrate fresh    # Drop all tables and re-run all migrations</code></pre>
 
                         <h3>Create a Standard Controller</h3>
-                        <pre><code>php srin make:controller HomeController</code></pre>
+                        <pre><code>srin add controller Home</code></pre>
                         <p>Generates <code>Controller/HomeController.php</code> extending <code>BaseController</code>.</p>
 
                         <h3>Create a Controller with Mail Transfer</h3>
-                        <pre><code>php srin make:controller ContactController --mail</code></pre>
+                        <pre><code>srin add controller Contact --mail</code></pre>
                         <p>Generates a complete controller with form validation, CSRF verification, and mail dispatch using <code>Core\Mailer</code>.</p>
 
                         <h3>Create a New Frontend Page (<code>.srin.php</code>)</h3>
-                        <pre><code>php srin make:page about</code></pre>
+                        <pre><code>srin add page about</code></pre>
                         <p>Generates <code>Pages/about.srin.php</code> pre-connected to <code>&#91;connect 'layouts/main'&#93;</code>.</p>
 
                         <h3>Create a New Layout</h3>
-                        <pre><code>php srin make:layout admin</code></pre>
+                        <pre><code>srin add layout admin</code></pre>
                         <p>Generates <code>Pages/layouts/admin.srin.php</code> pre-wired with <code>[[ asset('/css/style.css') ]]</code> and <code>&#91;slot&#93;</code>.</p>
 
                         <h3>Create Custom Error Page</h3>
-                        <pre><code>php srin make:error 404</code></pre>
+                        <pre><code>srin add error 404</code></pre>
 
-                        <h3>List Registered Routes</h3>
-                        <pre><code>php srin routes</code></pre>
+                        <h3>List Registered Route Links</h3>
+                        <pre><code>srin links</code></pre>
 
                         <h3>Start the Local Server</h3>
-                        <pre><code>php srin serve --port=8000</code></pre>
+                        <pre><code>srin dev --port=8000</code></pre>
 
-                        <h3>One-Command System Upgrade (<code>php srin upgrade</code>)</h3>
+                        <h3>One-Command System Upgrade (<code>srin upgrade</code>)</h3>
                         <p>Automatically checks for official updates from GitHub (<code>deadxfire/srin</code>) and upgrades the default core framework files with overwrite, while strictly preserving your project code:</p>
                         <pre><code># Check and upgrade default system code to the latest release:
-php srin upgrade
+srin upgrade
 
 # Force overwrite default system files with latest repository code:
 php srin upgrade --force
@@ -331,10 +331,10 @@ php srin upgrade --check</code></pre>
 
                         <h3>1. Generate a Model &amp; Migration:</h3>
                         <pre><code># Generate both the model and migration blueprint together:
-php srin make:model Article -m
+srin add model Article -m
 
 # Or create a standalone migration:
-php srin make:migration create_articles_table</code></pre>
+srin add migration create_articles_table</code></pre>
 
                         <h3>2. Detailed Migration Code Sample (<code>database/migrations/YYYY_MM_DD_HHMMSS_create_articles_table.php</code>):</h3>
                         <p>Migrations extend <code>Core\Migration</code> and use <code>Core\Schema</code> with <code>Core\Blueprint</code>. Here is a production-grade schema demonstrating all column types, defaults, and modifiers:</p>
@@ -1453,13 +1453,13 @@ composer create-project deadxfire/srin my-project</code></pre>
 
                         <h3>Create Error Pages via CLI:</h3>
                         <pre><code># Create custom 404 Not Found page
-php srin make:error 404
+srin add error 404
 
 # Create custom 500 Server Error page
-php srin make:error 500
+srin add error 500
 
 # Create custom 403 Forbidden page
-php srin make:error 403</code></pre>
+srin add error 403</code></pre>
 
                         <h3>How Automatic Error Routing Works:</h3>
                         <ul class="feature-bullets">
