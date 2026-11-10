@@ -30,8 +30,9 @@ class Schema
      */
     public static function drop(string $table): void
     {
+        $clean = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
         $driver = Database::getDriver();
-        $ident = ($driver === 'pgsql') ? "\"{$table}\"" : "`{$table}`";
+        $ident = ($driver === 'pgsql') ? "\"{$clean}\"" : "`{$clean}`";
         Database::statement("DROP TABLE {$ident};");
     }
 
@@ -40,8 +41,9 @@ class Schema
      */
     public static function dropIfExists(string $table): void
     {
+        $clean = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
         $driver = Database::getDriver();
-        $ident = ($driver === 'pgsql') ? "\"{$table}\"" : "`{$table}`";
+        $ident = ($driver === 'pgsql') ? "\"{$clean}\"" : "`{$clean}`";
         Database::statement("DROP TABLE IF EXISTS {$ident};");
     }
 
@@ -76,7 +78,8 @@ class Schema
         $driver = Database::getDriver();
 
         if ($driver === 'sqlite') {
-            $cols = Database::select("PRAGMA table_info(`{$table}`)");
+            $clean = preg_replace('/[^a-zA-Z0-9_]/', '', $table);
+            $cols = Database::select("PRAGMA table_info(`{$clean}`)");
             foreach ($cols as $col) {
                 if (strcasecmp($col['name'], $column) === 0) {
                     return true;

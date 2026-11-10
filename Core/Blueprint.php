@@ -226,7 +226,9 @@ class Blueprint
         }
 
         if ($col->default !== null) {
-            $default = is_bool($col->default) ? ($col->default ? '1' : '0') : (is_numeric($col->default) ? $col->default : "'{$col->default}'");
+            $default = is_bool($col->default)
+                ? ($col->default ? '1' : '0')
+                : (is_numeric($col->default) ? $col->default : "'" . str_replace("'", "''", (string) $col->default) . "'");
             $def .= " DEFAULT {$default}";
         }
 

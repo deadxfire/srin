@@ -312,7 +312,7 @@ if (!function_exists('asset')) {
 
 if (!function_exists('assets')) {
     /**
-     * Alias for asset() to match {{assets('/css/style.css')}} syntax.
+     * Expressive alias for asset().
      */
     function assets(string $path = ''): string
     {
@@ -459,7 +459,7 @@ if (!function_exists('old')) {
             session_start();
         }
 
-        $old = $_SESSION['_old'] ?? [];
+        $old = is_array($_SESSION['_old'] ?? null) ? $_SESSION['_old'] : [];
         if (array_key_exists($key, $old)) {
             return $old[$key];
         }
@@ -556,9 +556,9 @@ if (!function_exists('is_home')) {
      * Check if the current page is the homepage ('/' or route named 'home' / 'index').
      *
      * Example:
-     *   @unless(is_home())
+     *   [if !is_home()]
      *       <div class="subpage-banner">...</div>
-     *   @endunless
+     *   [end]
      */
     function is_home(): bool
     {
@@ -578,9 +578,9 @@ if (!function_exists('is_route')) {
      * Supports wildcards e.g. is_route('blog.*') or is_route('contact').
      *
      * Example:
-     *   @if(!is_route('home'))
+     *   [if !is_route('home')]
      *       <div class="breadcrumb">...</div>
-     *   @endif
+     *   [end]
      */
     function is_route(string|array $patterns): bool
     {

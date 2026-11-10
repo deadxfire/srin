@@ -177,10 +177,18 @@ class Paginator implements IteratorAggregate, Countable, ArrayAccess, JsonSerial
             $page = 1;
         }
 
-        $parameters = array_merge($this->query, [$this->pageName => $page]);
+        $basePath = $this->path;
+        $existing = [];
+
+        if (str_contains($basePath, '?')) {
+            [$basePath, $queryPart] = explode('?', $basePath, 2);
+            parse_str($queryPart, $existing);
+        }
+
+        $parameters = array_merge($existing, $this->query, [$this->pageName => $page]);
         $queryString = http_build_query($parameters);
 
-        return $this->path . ($queryString !== '' ? '?' . $queryString : '');
+        return $basePath . ($queryString !== '' ? '?' . $queryString : '');
     }
 
     /**

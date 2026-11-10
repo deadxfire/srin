@@ -21,7 +21,7 @@ if (php_sapi_name() === 'cli-server') {
     if (!str_contains($uriPath, "\0") && !str_contains($uriPath, '..') &&
         !str_contains($decodedUri, "\0") && !str_contains($decodedUri, '..')) {
         $realAssets = realpath(__DIR__ . '/assets');
-        $targetFile = realpath(__DIR__ . $uriPath);
+        $targetFile = realpath(__DIR__ . $decodedUri);
 
         if ($realAssets && $targetFile && is_file($targetFile)) {
             // Only allow direct static streaming if the file resides STRICTLY inside the assets/ directory
@@ -63,8 +63,9 @@ if (file_exists($composerAutoload)) {
             'Controller\\' => __DIR__ . '/Controller/',
             'Core\\'       => __DIR__ . '/Core/',
             'Config\\'     => __DIR__ . '/Config/',
-            'Model\\'      => __DIR__ . '/Model/',
-            'Checkpoint\\' => __DIR__ . '/Checkpoint/',
+            'Model\\'            => __DIR__ . '/Model/',
+            'Checkpoint\\'       => __DIR__ . '/Checkpoint/',
+            'Database\\Seeders\\' => __DIR__ . '/database/seeders/',
         ];
 
         foreach ($prefixes as $prefix => $baseDir) {

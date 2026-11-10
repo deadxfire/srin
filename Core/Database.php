@@ -243,14 +243,21 @@ class Database
     public static function transaction(callable $callback): mixed
     {
         $pdo = self::connection();
-        $pdo->beginTransaction();
+        $isNested = $pdo->inTransaction();
+        if (!$isNested) {
+            $pdo->beginTransaction();
+        }
 
         try {
             $result = $callback($pdo);
-            $pdo->commit();
+            if (!$isNested && $pdo->inTransaction()) {
+                $pdo->commit();
+            }
             return $result;
         } catch (\Throwable $e) {
-            $pdo->rollBack();
+            if (!$isNested && $pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
             throw $e;
         }
     }

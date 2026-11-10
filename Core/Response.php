@@ -210,9 +210,7 @@ class Response
 
         $pagesDir = dirname(__DIR__) . '/Pages';
         $errorFileSrin = $pagesDir . "/errors/{$code}.srin.php";
-        $errorFilePhp = $pagesDir . "/errors/{$code}.php";
         $directFileSrin = $pagesDir . "/{$code}.srin.php";
-        $directFilePhp = $pagesDir . "/{$code}.php";
 
         $errorData = [
             'code' => $code,
@@ -223,36 +221,22 @@ class Response
 
         // 1. Look for Pages/errors/{code}.srin.php
         if (file_exists($errorFileSrin)) {
-            echo View::render("errors/{$code}", $errorData);
-            exit;
+            $output = View::render("errors/{$code}", $errorData);
+        } elseif (file_exists($directFileSrin)) {
+            // 2. Look for Pages/{code}.srin.php
+            $output = View::render((string) $code, $errorData);
+        } else {
+            // 3. Fallback built-in design
+            $output = self::defaultErrorPage($code, $statusText, $finalMessage);
         }
 
-        // Also support Pages/errors/{code}.php directly without eval()
-        if (file_exists($errorFilePhp)) {
-            (static function ($__file, $__data) {
-                extract($__data, EXTR_SKIP);
-                include $__file;
-            })($errorFilePhp, $errorData);
-            exit;
+        if (class_exists(Igniter::class)) {
+            Igniter::trigger('response', $output);
         }
-
-        // 2. Look for Pages/{code}.srin.php
-        if (file_exists($directFileSrin)) {
-            echo View::render((string) $code, $errorData);
-            exit;
+        echo $output;
+        if (class_exists(Igniter::class)) {
+            Igniter::trigger('terminate');
         }
-
-        // Also support Pages/{code}.php directly without eval()
-        if (file_exists($directFilePhp)) {
-            (static function ($__file, $__data) {
-                extract($__data, EXTR_SKIP);
-                include $__file;
-            })($directFilePhp, $errorData);
-            exit;
-        }
-
-        // 3. Fallback built-in design
-        echo self::defaultErrorPage($code, $statusText, $finalMessage);
         exit;
     }
 

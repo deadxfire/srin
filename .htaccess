@@ -9,7 +9,7 @@ Options -Indexes +FollowSymLinks
 # 2. Character Encoding
 AddDefaultCharset UTF-8
 
-# 3. Standard Security Headers (Defense-in-depth)
+# 3. Security Headers (Modern Web Defense-in-Depth)
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"

@@ -19,11 +19,16 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         array (
             'Model\\' => 6,
         ),
+        'D' =>
+        array (
+            'Database\\Seeders\\' => 17,
+        ),
         'C' =>
         array (
             'Core\\' => 5,
             'Controller\\' => 11,
             'Config\\' => 7,
+            'Checkpoint\\' => 11,
         ),
     );
 
@@ -35,6 +40,10 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         'Model\\' =>
         array (
             0 => __DIR__ . '/../..' . '/Model',
+        ),
+        'Database\\Seeders\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/database/seeders',
         ),
         'Core\\' =>
         array (
@@ -48,19 +57,48 @@ class ComposerStaticInit769df824332685d8337a2d092b2c8412
         array (
             0 => __DIR__ . '/../..' . '/Config',
         ),
+        'Checkpoint\\' =>
+        array (
+            0 => __DIR__ . '/../..' . '/Checkpoint',
+        ),
     );
 
     public static $classMap = array (
+        'Checkpoint\\AdminCheckpoint' => __DIR__ . '/../..' . '/Checkpoint/AdminCheckpoint.php',
+        'Checkpoint\\AuthCheckpoint' => __DIR__ . '/../..' . '/Checkpoint/AuthCheckpoint.php',
+        'Checkpoint\\GuestCheckpoint' => __DIR__ . '/../..' . '/Checkpoint/GuestCheckpoint.php',
         'Composer\\InstalledVersions' => __DIR__ . '/..' . '/composer/InstalledVersions.php',
         'Core\\App' => __DIR__ . '/../..' . '/Core/App.php',
+        'Core\\Auth' => __DIR__ . '/../..' . '/Core/Auth.php',
         'Core\\BaseController' => __DIR__ . '/../..' . '/Core/BaseController.php',
+        'Core\\Blueprint' => __DIR__ . '/../..' . '/Core/Blueprint.php',
+        'Core\\Checkpoint' => __DIR__ . '/../..' . '/Core/Checkpoint.php',
+        'Core\\Crypt' => __DIR__ . '/../..' . '/Core/Crypt.php',
+        'Core\\Database' => __DIR__ . '/../..' . '/Core/Database.php',
+        'Core\\Engine' => __DIR__ . '/../..' . '/Core/Engine.php',
+        'Core\\Igniter' => __DIR__ . '/../..' . '/Core/Igniter.php',
+        'Core\\Log' => __DIR__ . '/../..' . '/Core/Log.php',
         'Core\\Mailer' => __DIR__ . '/../..' . '/Core/Mailer.php',
+        'Core\\Migration' => __DIR__ . '/../..' . '/Core/Migration.php',
+        'Core\\Migrator' => __DIR__ . '/../..' . '/Core/Migrator.php',
+        'Core\\Model' => __DIR__ . '/../..' . '/Core/Model.php',
+        'Core\\Paginator' => __DIR__ . '/../..' . '/Core/Paginator.php',
+        'Core\\QueryBuilder' => __DIR__ . '/../..' . '/Core/QueryBuilder.php',
+        'Core\\Relations\\BelongsTo' => __DIR__ . '/../..' . '/Core/Relations/BelongsTo.php',
+        'Core\\Relations\\HasMany' => __DIR__ . '/../..' . '/Core/Relations/HasMany.php',
+        'Core\\Relations\\HasOne' => __DIR__ . '/../..' . '/Core/Relations/HasOne.php',
+        'Core\\Relations\\Relation' => __DIR__ . '/../..' . '/Core/Relations/Relation.php',
         'Core\\Request' => __DIR__ . '/../..' . '/Core/Request.php',
         'Core\\Response' => __DIR__ . '/../..' . '/Core/Response.php',
         'Core\\Route' => __DIR__ . '/../..' . '/Core/Route.php',
         'Core\\Router' => __DIR__ . '/../..' . '/Core/Router.php',
+        'Core\\Schema' => __DIR__ . '/../..' . '/Core/Schema.php',
         'Core\\Security' => __DIR__ . '/../..' . '/Core/Security.php',
+        'Core\\Seeder' => __DIR__ . '/../..' . '/Core/Seeder.php',
+        'Core\\Spark' => __DIR__ . '/../..' . '/Core/Spark.php',
         'Core\\View' => __DIR__ . '/../..' . '/Core/View.php',
+        'Database\\Seeders\\DatabaseSeeder' => __DIR__ . '/../..' . '/database/seeders/DatabaseSeeder.php',
+        'Model\\Account' => __DIR__ . '/../..' . '/Model/Account.php',
         'PHPMailer\\PHPMailer\\DSNConfigurator' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/DSNConfigurator.php',
         'PHPMailer\\PHPMailer\\Exception' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/Exception.php',
         'PHPMailer\\PHPMailer\\OAuth' => __DIR__ . '/..' . '/phpmailer/phpmailer/src/OAuth.php',

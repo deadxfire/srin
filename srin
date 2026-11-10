@@ -166,6 +166,7 @@ namespace Controller;
 
 use Core\Mailer;
 use Core\Request;
+use Core\BaseController;
 
 class {$cleanName} extends BaseController
 {
@@ -237,6 +238,8 @@ PHP;
 <?php
 
 namespace Controller;
+
+use Core\BaseController;
 
 class {$cleanName} extends BaseController
 {
@@ -929,6 +932,33 @@ function bootstrapApp(string $baseDir): void
     $autoload = $baseDir . '/Others/autoload.php';
     if (file_exists($autoload)) {
         require_once $autoload;
+    } else {
+        spl_autoload_register(function ($class) use ($baseDir) {
+            $prefixes = [
+                'Controller\\'        => $baseDir . '/Controller/',
+                'Core\\'              => $baseDir . '/Core/',
+                'Config\\'            => $baseDir . '/Config/',
+                'Model\\'             => $baseDir . '/Model/',
+                'Checkpoint\\'        => $baseDir . '/Checkpoint/',
+                'Database\\Seeders\\' => $baseDir . '/database/seeders/',
+            ];
+
+            foreach ($prefixes as $prefix => $targetDir) {
+                $len = strlen($prefix);
+                if (strncmp($prefix, $class, $len) === 0) {
+                    $relativeClass = substr($class, $len);
+                    $file = $targetDir . str_replace('\\', '/', $relativeClass) . '.php';
+                    if (file_exists($file)) {
+                        require $file;
+                        return;
+                    }
+                }
+            }
+        });
+
+        if (file_exists($baseDir . '/Core/Helper.php')) {
+            require_once $baseDir . '/Core/Helper.php';
+        }
     }
     \Core\App::loadEnv($baseDir . '/.env');
 }

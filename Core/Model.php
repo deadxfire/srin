@@ -399,6 +399,9 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         if (is_array($idOrCriteria)) {
+            if ($dummy->timestamps && !array_key_exists('updated_at', $safeAttributes)) {
+                $safeAttributes['updated_at'] = date('Y-m-d H:i:s');
+            }
             return static::fetch($idOrCriteria)->update($safeAttributes) >= 0;
         }
 

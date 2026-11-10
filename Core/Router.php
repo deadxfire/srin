@@ -291,12 +291,13 @@ class Router
                 }
 
                 array_shift($matches); // Remove full match
+                $params = array_map('rawurldecode', $matches);
                 self::$currentRoute = $route;
 
                 $checkpoints = $route->getCheckpoints();
 
-                $action = function () use ($route, $matches) {
-                    return self::executeHandler($route->getHandler(), $matches);
+                $action = function () use ($route, $params) {
+                    return self::executeHandler($route->getHandler(), $params);
                 };
 
                 // For HEAD requests, buffer and suppress output body while preserving headers
@@ -352,8 +353,13 @@ class Router
         }
 
         if (is_string($handler)) {
-            // e.g. "HomeController@index"
-            [$controllerName, $methodName] = explode('@', $handler);
+            // e.g. "HomeController@index" or "HomeController" (invokable or default index)
+            if (str_contains($handler, '@')) {
+                [$controllerName, $methodName] = explode('@', $handler, 2);
+            } else {
+                $controllerName = $handler;
+                $methodName = '__invoke';
+            }
 
             if (!str_contains($controllerName, '\\')) {
                 $controllerClass = "Controller\\{$controllerName}";
@@ -368,7 +374,11 @@ class Router
             $instance = new $controllerClass();
 
             if (!method_exists($instance, $methodName)) {
-                throw new Exception("Method [{$methodName}] does not exist on controller [{$controllerClass}].");
+                if ($methodName === '__invoke' && method_exists($instance, 'index')) {
+                    $methodName = 'index';
+                } else {
+                    throw new Exception("Method [{$methodName}] does not exist on controller [{$controllerClass}].");
+                }
             }
 
             return call_user_func_array([$instance, $methodName], $params);

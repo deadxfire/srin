@@ -15,8 +15,8 @@ use Core\Router;
 |     Router::post('/contact', 'ContactController@sendMail')->name('contact.send');
 |
 | Link to named routes in .srin.php templates:
-|     <a href="{{route('about')}}">About Us</a>
-|     <a href="{{route('contact')}}">Contact</a>
+|     <a href="[[ route('about') ]]">About Us</a>
+|     <a href="[[ route('contact') ]]">Contact</a>
 | Or in PHP:
 |     <a href="<?= route('about') ?>">About Us</a>
 |

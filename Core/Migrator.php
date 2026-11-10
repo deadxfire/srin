@@ -170,8 +170,13 @@ class Migrator
         if ($driver === 'sqlite') {
             $dbPath = config('database.connections.sqlite.database');
             Database::disconnect();
-            if ($dbPath !== ':memory:' && file_exists($dbPath)) {
-                @unlink($dbPath);
+            if ($dbPath !== ':memory:') {
+                if (!str_starts_with($dbPath, '/') && !preg_match('/^[a-zA-Z]:[\\\\\/]/', $dbPath)) {
+                    $dbPath = dirname(__DIR__) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $dbPath);
+                }
+                if (file_exists($dbPath)) {
+                    @unlink($dbPath);
+                }
             }
         } elseif ($driver === 'pgsql') {
             // PostgreSQL: query information_schema for user tables
