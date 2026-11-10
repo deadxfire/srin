@@ -29,7 +29,11 @@ class Log
             self::$logDir = dirname(__DIR__) . '/Others/logs';
         }
         if (!is_dir(self::$logDir)) {
-            @mkdir(self::$logDir, 0777, true);
+            @mkdir(self::$logDir, 0750, true);
+        }
+        $ht = self::$logDir . '/.htaccess';
+        if (!file_exists($ht)) {
+            @file_put_contents($ht, "Order Deny,Allow\nDeny from all\n");
         }
         return self::$logDir;
     }

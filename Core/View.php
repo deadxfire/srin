@@ -41,7 +41,7 @@ class View
         }
 
         // Security check: Template must reside strictly within Pages directory
-        if (!$realPages || !str_starts_with($realPageFile, $realPages)) {
+        if (!$realPages || !str_starts_with($realPageFile, $realPages . DIRECTORY_SEPARATOR)) {
             throw new Exception("Security violation: Template [{$page}] is located outside the Pages directory.");
         }
 
@@ -74,9 +74,9 @@ class View
             $sections['title'] = $data['title'];
         }
 
-        // 3. Extract named content sections: [block 'name']...[blockend] or [/block] or [end]
+        // 3. Extract named content sections: [block 'name']...[blockend] or [/block]
         $sections = [];
-        $sectionPattern = '/\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section)|end)\]/si';
+        $sectionPattern = '/\[(?:block|section)\s*[\'"]([^\'"]+)[\'"]\s*\](.*?)\[(?:blockend|sectionend|endblock|endsection|\/(?:block|section))\]/si';
 
         $rawContent = preg_replace_callback($sectionPattern, function ($m) use (&$sections, $data) {
             $name = trim($m[1] ?? '');
@@ -109,6 +109,15 @@ class View
         }
 
         return $body;
+    }
+
+    /**
+     * Render a raw template string with compiled directives and data.
+     */
+    public static function renderString(string $template, array $data = []): string
+    {
+        $compiled = self::compileDirectives($template);
+        return self::evaluate($compiled, $data);
     }
 
     /**
@@ -190,8 +199,9 @@ class View
      */
     public static function compileDirectives(string $template): string
     {
-        // 0. Strict check: Disallow Laravel Blade syntax
-        if (preg_match('/(?<![a-zA-Z0-9_@])@(if|elseif|else|endif|foreach|endforeach|for|endfor|while|endwhile|unless|endunless|isset|endisset|empty|endempty|Connect|connect|include|content|contentConnect|csrf|honeypot)\b/i', $template, $bladeMatch)) {
+        // 0. Strict check: Disallow Laravel Blade syntax (only when used as actual directives, not plain text like "@for")
+        if (preg_match('/(?<![a-zA-Z0-9_@])@(if|elseif|foreach|for|while|unless|isset|empty)\s*\(/i', $template, $bladeMatch)
+            || preg_match('/(?<![a-zA-Z0-9_@])@(endif|endforeach|endfor|endwhile|endunless|endisset|endempty|csrf|honeypot)\b/i', $template, $bladeMatch)) {
             throw new Exception("Srin Template Error: Blade directive '{$bladeMatch[0]}' is not supported in Srin Engine. Please use Srin Tags instead (e.g. [if ...], [each ...], [end], [layout '...'], [include '...']).");
         }
 
@@ -206,17 +216,22 @@ class View
             return $token;
         }, $template);
 
+        // Support {{ ... }} as an alias for safe double brackets [[ ... ]]
+        $template = preg_replace('/\{\{\s*(.+?)\s*\}\}/s', '[[ $1 ]]', $template);
+
         // 3. Raw / unescaped HTML output: [{ $expression }] (Srin standard)
         $template = preg_replace('/\[\{\s*(.+?)\s*\}\]/s', '<?= $1 ?>', $template);
 
-        // 4. Double brackets safe output: [[ $expression ]] (Srin standard)
-        $template = preg_replace_callback('/\[\[\s*(.+?)\s*\]\]/s', function ($m) {
+        // 4. Double brackets safe output: [[ $expression ]] (Srin standard, supports nested brackets like $a[$b[0]])
+        $safeOutputPattern = '/\[\[\s*((?:[^\[\]"\']+|"[^"\\\\]*(?:\\\\.[^"\\\\]*)*"|\'[^\'\\\\]*(?:\\\\.[^\'\\\\]*)*\'|\[(?1)\])*)\s*\]\]/s';
+        $template = preg_replace_callback($safeOutputPattern, function ($m) {
             $expr = trim($m[1]);
             if ($expr === '') {
                 return '[[ ]]';
             }
             $expr = rtrim($expr, ';');
-            if (preg_match('/^(?:assets?|route|url|csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
+            // Only raw HTML field generators are emitted without escaping
+            if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
                 return "<?= {$expr} ?>";
             }
             return "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
@@ -401,19 +416,22 @@ class View
     /**
      * Evaluate compiled template code in an isolated scope.
      */
-    public static function evaluate(string $code, array $data): string
+    public static function evaluate(string $__srin_code__, array $__srin_data__): string
     {
-        extract($data, EXTR_SKIP);
+        return (static function () use ($__srin_code__, $__srin_data__) {
+            extract($__srin_data__, EXTR_OVERWRITE);
+            unset($__srin_data__);
 
-        ob_start();
-        try {
-            eval('?>' . $code);
-        } catch (\Throwable $e) {
-            ob_end_clean();
-            throw $e;
-        }
+            ob_start();
+            try {
+                eval('?>' . $__srin_code__);
+            } catch (\Throwable $__srin_e__) {
+                ob_end_clean();
+                throw $__srin_e__;
+            }
 
-        return ob_get_clean() ?: '';
+            return ob_get_clean() ?: '';
+        })();
     }
 
     /**

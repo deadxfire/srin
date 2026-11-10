@@ -27,13 +27,21 @@ ErrorDocument 404 /index.php
     RewriteEngine On
     RewriteBase /
 
-    # Allow direct HTTP access ONLY for existing static/downloadable files inside assets/
+    # Block direct HTTP access to sensitive core directories and config files
+    RewriteRule ^(\.env|composer\.(json|lock)|database/|Others/logs/|Config/|srin) - [F,L,NC]
+
+    # Strictly block direct execution of PHP scripts inside assets/
+    RewriteCond %{REQUEST_URI} ^/assets/.*\.(php[0-9]?|phtml|phar|phps)$ [NC]
+    RewriteRule ^ - [F,L]
+
+    # Allow direct HTTP access ONLY for non-PHP existing static files inside assets/
     RewriteCond %{REQUEST_URI} ^/assets/ [NC]
     RewriteCond %{REQUEST_FILENAME} -f
+    RewriteCond %{REQUEST_FILENAME} !\.(php[0-9]?|phtml|phar|phps)$ [NC]
     RewriteRule ^ - [L]
 
     # Route ALL other requests to index.php
-    # Direct access to /core/App.php, /Config/app.php, /Pages/welcome.rinswa.php, etc.
+    # Direct access to /core/App.php, /Config/app.php, etc.
     # will be processed by index.php -> Router -> Response::renderError(404)!
     RewriteRule ^ index.php [L,QSA]
 </IfModule>

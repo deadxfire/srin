@@ -21,8 +21,12 @@ if (php_sapi_name() === 'cli-server') {
         $realAssets = realpath(__DIR__ . '/assets');
 
         // Only allow direct static streaming if the file resides STRICTLY inside the assets/ directory
-        if ($realAssets && str_starts_with($targetFile, $realAssets)) {
-            return false; // Valid asset file -> let PHP CLI server stream it directly
+        if ($realAssets && str_starts_with($targetFile, $realAssets . DIRECTORY_SEPARATOR)) {
+            // Never serve PHP files directly from assets/
+            $ext = strtolower(pathinfo($targetFile, PATHINFO_EXTENSION));
+            if (!in_array($ext, ['php', 'phtml', 'phar', 'htaccess'], true)) {
+                return false; // Valid asset file -> let PHP CLI server stream it directly
+            }
         }
 
         // For non-asset files (e.g. /core/App.php, /Config/mail.php, /Pages/...), do NOT return false.

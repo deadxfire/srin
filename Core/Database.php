@@ -79,12 +79,19 @@ class Database
 
             $dir = dirname($dbPath);
             if (!is_dir($dir)) {
-                @mkdir($dir, 0777, true);
+                @mkdir($dir, 0750, true);
+            }
+
+            // Ensure database directory has a protecting .htaccess
+            $ht = $dir . DIRECTORY_SEPARATOR . '.htaccess';
+            if (!file_exists($ht)) {
+                @file_put_contents($ht, "Order Deny,Allow\nDeny from all\n");
             }
 
             // Create empty file if missing
             if (!file_exists($dbPath)) {
                 @touch($dbPath);
+                @chmod($dbPath, 0640);
             }
         }
 

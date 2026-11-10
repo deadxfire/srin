@@ -24,6 +24,10 @@ class Response
             header('Content-Type: application/json; charset=utf-8');
         }
         echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        if (class_exists(Igniter::class)) {
+            Igniter::trigger('response');
+            Igniter::trigger('terminate');
+        }
         exit;
     }
 
@@ -37,16 +41,36 @@ class Response
         if (!headers_sent()) {
             header("Location: {$cleanUrl}");
         }
+        if (class_exists(Igniter::class)) {
+            Igniter::trigger('response');
+            Igniter::trigger('terminate');
+        }
         exit;
     }
 
     /**
      * Redirect back to previous URL (HTTP_REFERER) or a fallback route.
+     * Prevents open-redirect attacks by validating against application host.
      */
     public static function back(int $statusCode = 302, string $fallback = '/'): void
     {
         $referer = $_SERVER['HTTP_REFERER'] ?? '';
-        $target = ($referer !== '' && filter_var($referer, FILTER_VALIDATE_URL)) ? $referer : $fallback;
+        $target = $fallback;
+
+        if ($referer !== '' && filter_var($referer, FILTER_VALIDATE_URL)) {
+            $refHost = parse_url($referer, PHP_URL_HOST);
+            $currentHost = $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? '';
+            if (str_contains($currentHost, ':')) {
+                $currentHost = explode(':', $currentHost)[0];
+            }
+            // Only allow redirect to same host
+            if ($refHost === $currentHost) {
+                $target = $referer;
+            }
+        } elseif (str_starts_with($referer, '/') && !str_starts_with($referer, '//')) {
+            $target = $referer;
+        }
+
         self::redirect($target, $statusCode);
     }
 
@@ -69,8 +93,12 @@ class Response
      */
     public static function download(string $assetPath, ?string $downloadName = null): void
     {
-        // 1. Strip traversal sequences and normalize slashes
-        $clean = ltrim(str_replace(['\\', '../', '..\\'], ['/', '', ''], $assetPath), '/');
+        // 1. Recursively strip traversal sequences and normalize slashes
+        do {
+            $assetPath = str_replace(['../', '..\\'], '', $assetPath, $count);
+        } while ($count > 0);
+
+        $clean = ltrim(str_replace(['\\', '/'], '/', $assetPath), '/');
         if (str_starts_with($clean, 'assets/')) {
             $clean = substr($clean, 7);
         }
@@ -88,14 +116,14 @@ class Response
             exit;
         }
 
-        // Security Check 2: Strictly enforce assets/ boundary (throws 404 for disguise)
-        if (!$assetsDir || !str_starts_with($targetPath, $assetsDir)) {
+        // Security Check 2: Strictly enforce assets/ boundary with trailing separator
+        if (!$assetsDir || !str_starts_with($targetPath, $assetsDir . DIRECTORY_SEPARATOR)) {
             self::renderError(404, "Downloadable file not found.");
             exit;
         }
 
         // Security Check 3: Explicitly block any attempt to download from Pages/ (throws 404)
-        if ($pagesDir && str_starts_with($targetPath, $pagesDir)) {
+        if ($pagesDir && str_starts_with($targetPath, $pagesDir . DIRECTORY_SEPARATOR)) {
             self::renderError(404, "Downloadable file not found.");
             exit;
         }
@@ -172,13 +200,12 @@ class Response
             exit;
         }
 
-        // Also support Pages/errors/{code}.php directly
+        // Also support Pages/errors/{code}.php directly without eval()
         if (file_exists($errorFilePhp)) {
-            $raw = file_get_contents($errorFilePhp);
-            extract($errorData, EXTR_SKIP);
-            ob_start();
-            eval('?>' . $raw);
-            echo ob_get_clean();
+            (static function ($__file, $__data) {
+                extract($__data, EXTR_OVERWRITE);
+                include $__file;
+            })($errorFilePhp, $errorData);
             exit;
         }
 
@@ -188,13 +215,12 @@ class Response
             exit;
         }
 
-        // Also support Pages/{code}.php directly
+        // Also support Pages/{code}.php directly without eval()
         if (file_exists($directFilePhp)) {
-            $raw = file_get_contents($directFilePhp);
-            extract($errorData, EXTR_SKIP);
-            ob_start();
-            eval('?>' . $raw);
-            echo ob_get_clean();
+            (static function ($__file, $__data) {
+                extract($__data, EXTR_OVERWRITE);
+                include $__file;
+            })($directFilePhp, $errorData);
             exit;
         }
 

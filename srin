@@ -109,6 +109,10 @@ switch ($command) {
         handleClearLogs($baseDir);
         break;
 
+    case 'key:generate':
+        handleKeyGenerate($baseDir);
+        break;
+
     case 'serve':
         handleServe($arguments);
         break;
@@ -1362,6 +1366,12 @@ function handleUpgrade(array $args, string $baseDir): void
         }
     }
 
+    // Strictly validate branch name to prevent directory traversal or URL injection
+    if (!preg_match('/^[a-zA-Z0-9_.\-]+$/', $branch)) {
+        echo color("\n[X] Error: Invalid branch name '{$branch}'.\n\n", 'red');
+        return;
+    }
+
     // Determine local version
     $localVersion = '1.2.0';
     if (file_exists($baseDir . '/Core/App.php')) {
@@ -1504,10 +1514,24 @@ function handleUpgrade(array $args, string $baseDir): void
         echo "  " . color("[DONE]", 'green') . " Upgraded Core/ framework engine ({$c} files)\n";
     }
 
-    // B. Overwrite Config/ (default configs only, user secrets remain in .env)
+    // B. Upgrade Config/ (only copy brand new configuration files without overwriting existing ones)
     if (is_dir($sourceDir . '/Config')) {
-        $c = srinCopyDirectory($sourceDir . '/Config', $baseDir . '/Config', [], $isDryRun);
-        echo "  " . color("[DONE]", 'green') . " Upgraded Config/ definitions ({$c} files)\n";
+        $c = 0;
+        $configEntries = scandir($sourceDir . '/Config');
+        if ($configEntries !== false) {
+            foreach ($configEntries as $entry) {
+                if ($entry !== '.' && $entry !== '..' && str_ends_with($entry, '.php')) {
+                    $destFile = $baseDir . '/Config/' . $entry;
+                    if (!file_exists($destFile)) {
+                        if (!$isDryRun) {
+                            copy($sourceDir . '/Config/' . $entry, $destFile);
+                        }
+                        $c++;
+                    }
+                }
+            }
+        }
+        echo "  " . color("[DONE]", 'green') . " Preserved Config/ definitions ({$c} new files added)\n";
     }
 
     // C. Overwrite Others/ (excluding runtime logs)
@@ -1516,14 +1540,13 @@ function handleUpgrade(array $args, string $baseDir): void
         echo "  " . color("[DONE]", 'green') . " Upgraded Others/ vendors & autoloaders ({$c} files)\n";
     }
 
-    // D. Overwrite root system scripts
+    // D. Overwrite root system scripts (preserve user composer.json)
     $rootFiles = [
         'srin',
         'srin.php',
         'index.php',
         '.htaccess',
         '.env.example',
-        'composer.json',
         'README.md',
     ];
 
@@ -1583,8 +1606,8 @@ function srinHttpGet(string $url): ?string
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Srin-Engine-Updater/1.0');
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_TIMEOUT, 15);
         $res = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1601,8 +1624,8 @@ function srinHttpGet(string $url): ?string
             'follow_location' => 1,
         ],
         'ssl' => [
-            'verify_peer' => false,
-            'verify_peer_name' => false,
+            'verify_peer' => true,
+            'verify_peer_name' => true,
         ],
     ]);
 
@@ -1625,8 +1648,8 @@ function srinDownloadFile(string $url, string $destination): bool
         curl_setopt($ch, CURLOPT_USERAGENT, 'Srin-Engine-Updater/1.0');
         curl_setopt($ch, CURLOPT_FILE, $fp);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
         curl_setopt($ch, CURLOPT_TIMEOUT, 60);
         $success = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
@@ -1642,8 +1665,8 @@ function srinDownloadFile(string $url, string $destination): bool
             'follow_location' => 1,
         ],
         'ssl' => [
-            'verify_peer' => false,
-            'verify_peer_name' => false,
+            'verify_peer' => true,
+            'verify_peer_name' => true,
         ],
     ]);
 
@@ -1724,6 +1747,38 @@ function srinDeleteDirectory(string $dir): bool
 }
 
 /**
+ * Handle key:generate command.
+ */
+function handleKeyGenerate(string $baseDir): void
+{
+    require_once $baseDir . '/Core/Crypt.php';
+
+    $key = \Core\Crypt::generateKey();
+    $envFile = $baseDir . '/.env';
+
+    if (!file_exists($envFile)) {
+        if (file_exists($baseDir . '/.env.example')) {
+            copy($baseDir . '/.env.example', $envFile);
+            echo color("[i] Created .env file from .env.example\n", 'cyan');
+        } else {
+            file_put_contents($envFile, "APP_KEY=\n");
+        }
+    }
+
+    $content = file_get_contents($envFile);
+    if (preg_match('/^APP_KEY=.*$/m', $content)) {
+        $content = preg_replace('/^APP_KEY=.*$/m', "APP_KEY={$key}", $content);
+    } else {
+        $content .= "\nAPP_KEY={$key}\n";
+    }
+
+    file_put_contents($envFile, $content);
+
+    echo color("\n[✓] Application key set successfully!\n", 'green');
+    echo "  Key: " . color($key, 'yellow') . "\n\n";
+}
+
+/**
  * Show Help / List of Commands.
  */
 function showHelp(): void
@@ -1754,6 +1809,7 @@ function showHelp(): void
     echo "  " . color("routes", 'green') . "                      List all registered routes from Routes/web.php\n";
     echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . " View application logs in terminal (live tail with -f)\n";
     echo "  " . color("clear:logs", 'green') . "                  Clear application and mail logs\n";
+    echo "  " . color("key:generate", 'green') . "                Generate application 256-bit encryption key (APP_KEY)\n";
     echo "  " . color("serve [--port=8000]", 'green') . "         Start PHP's built-in development server\n";
     echo "  " . color("upgrade [--force] [--check]", 'green') . " Upgrade Srin Engine to latest release with overwrite\n";
     echo "  " . color("help", 'green') . "                        Display this help screen\n\n";

@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? '404 - Page Not Found', ENT_QUOTES, 'UTF-8') ?></title>
-    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
-    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
+    <link rel="icon" type="image/svg+xml" href="[[ assets('/favicon.svg') ]]">
+    <link rel="alternate icon" href="[[ assets('/favicon.ico') ]]">
     <style>
         body { font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #f8fafc; min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; padding: 20px; text-align: center; }
         .card { max-width: 500px; background: #1e293b; border-radius: 16px; padding: 40px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.4); border: 1px solid #334155; }

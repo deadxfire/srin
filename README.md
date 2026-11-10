@@ -1175,12 +1175,23 @@ class AuthController extends BaseController
 }
 ```
 
-### 3. Global Auth Helpers
+### 3. Global Auth & Cryptographic Helpers
 Use these helpers anywhere in controllers, checkpoints, or templates:
 - `auth()` &rarr; Returns the authenticated `Model\Account` instance, or `null`.
 - `auth_check()` &rarr; Returns boolean `true` if logged in, `false` otherwise.
 - `auth_id()` &rarr; Returns primary key ID of the logged-in account.
 - `auth_account()` &rarr; Returns the account model instance.
+- `hash_password($password)` &rarr; Hashes a plain-text password using the powerful, memory-hard **Argon2id** algorithm (RFC 9106) with auto-peppering.
+- `verify_password($password, $hash)` &rarr; Constant-time timing-attack safe verification of plain-text passwords against hashes with backward compatibility.
+- `encrypt($value)` &rarr; Military-grade **AES-256-GCM** authenticated encryption with hardware acceleration (AEAD).
+- `decrypt($payload)` &rarr; Decrypts and validates authentication tags, rejecting tampered ciphertext safely.
+
+### 4. Advanced Password Hashing & Encryption Engine
+Srin provides modern, lightweight, hardware-hardened cryptographic security out-of-the-box:
+- **Argon2id (`PASSWORD_ARGON2ID`)**: Default password hashing algorithm; highly resistant to GPU/ASIC hardware brute-forcing.
+- **Application Pepper**: Optional secret pepper (`AUTH_PEPPER`) via HMAC-SHA256 to ensure database dumps cannot be cracked offline.
+- **Zero-Downtime Auto-Rehash**: `Auth::attempt()` automatically detects legacy Bcrypt or older parameter hashes and upgrades them seamlessly upon login.
+- **Key Generation CLI**: Run `php srin key:generate` to generate a secure 256-bit `APP_KEY` in your `.env`.
 
 ---
 

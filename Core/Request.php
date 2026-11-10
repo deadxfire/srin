@@ -23,8 +23,12 @@ class Request
             $baseDir = '';
         }
 
-        if ($baseDir !== '' && str_starts_with($uri, $baseDir)) {
-            $uri = substr($uri, strlen($baseDir));
+        if ($baseDir !== '') {
+            if ($uri === $baseDir) {
+                $uri = '/';
+            } elseif (str_starts_with($uri, $baseDir . '/')) {
+                $uri = substr($uri, strlen($baseDir));
+            }
         }
 
         // Normalize trailing slash (except root)
@@ -195,17 +199,27 @@ class Request
      */
     public static function ip(): string
     {
-        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ??
-              $_SERVER['REMOTE_ADDR'] ??
-              '127.0.0.1';
-
-        // In case multiple comma-separated IPs in proxy header, take the first client IP
-        if (str_contains($ip, ',')) {
-            $parts = explode(',', $ip);
-            $ip = trim($parts[0]);
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $trusted = function_exists('config') ? config('app.trusted_proxies', []) : [];
+        if (!is_array($trusted) && is_string($trusted) && $trusted !== '') {
+            $trusted = array_map('trim', explode(',', $trusted));
         }
 
-        return filter_var($ip, FILTER_VALIDATE_IP) ? $ip : '127.0.0.1';
+        // Only trust X-Forwarded-For if request came from a trusted reverse proxy
+        if (!empty($trusted) && in_array($remoteAddr, (array) $trusted, true)) {
+            $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null;
+            if ($forwarded) {
+                if (str_contains($forwarded, ',')) {
+                    $parts = explode(',', $forwarded);
+                    $forwarded = trim($parts[0]);
+                }
+                if (filter_var($forwarded, FILTER_VALIDATE_IP)) {
+                    return $forwarded;
+                }
+            }
+        }
+
+        return filter_var($remoteAddr, FILTER_VALIDATE_IP) ? $remoteAddr : '127.0.0.1';
     }
 
     /**

@@ -28,7 +28,6 @@ class Account extends Model
         'name',
         'email',
         'password',
-        'role',
         'avatar',
         'is_active',
     ];
@@ -40,6 +39,17 @@ class Account extends Model
      */
     protected array $guarded = [
         'id',
+        'role',
+    ];
+
+    /**
+     * Attributes hidden from array and JSON serialization.
+     *
+     * @var array<string>
+     */
+    protected array $hidden = [
+        'password',
+        'remember_token',
     ];
 
     /**

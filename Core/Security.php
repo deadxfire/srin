@@ -38,6 +38,19 @@ class Security
     }
 
     /**
+     * Regenerate and rotate the CSRF session token.
+     */
+    public static function regenerateCsrfToken(): string
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $_SESSION['_srin_csrf_token'] = bin2hex(random_bytes(32));
+        return $_SESSION['_srin_csrf_token'];
+    }
+
+    /**
      * Generate an HTML hidden input field containing the CSRF token.
      */
     public static function csrfField(): string
@@ -138,26 +151,35 @@ class Security
      */
     public static function rateLimit(string $key, int $maxAttempts = 5, int $decaySeconds = 60): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        $ip = Request::ip();
+        $rateKey = md5($key . '|' . $ip);
+        $cacheDir = dirname(__DIR__) . '/Others/cache/rates';
+        if (!is_dir($cacheDir)) {
+            @mkdir($cacheDir, 0750, true);
         }
 
-        $ip = Request::ip();
-        $rateKey = '_srin_rate_' . md5($key . '|' . $ip);
+        $cacheFile = $cacheDir . '/' . $rateKey . '.json';
         $now = time();
 
-        $record = $_SESSION[$rateKey] ?? ['attempts' => 0, 'reset' => $now + $decaySeconds];
+        $record = ['attempts' => 0, 'reset' => $now + $decaySeconds];
+        if (file_exists($cacheFile)) {
+            $content = @file_get_contents($cacheFile);
+            $data = json_decode((string) $content, true);
+            if (is_array($data) && isset($data['attempts'], $data['reset'])) {
+                $record = $data;
+            }
+        }
 
         // Reset if window expired
         if ($now > $record['reset']) {
             $record = ['attempts' => 1, 'reset' => $now + $decaySeconds];
-            $_SESSION[$rateKey] = $record;
+            @file_put_contents($cacheFile, json_encode($record), LOCK_EX);
             return true;
         }
 
         // Increment attempt
         $record['attempts']++;
-        $_SESSION[$rateKey] = $record;
+        @file_put_contents($cacheFile, json_encode($record), LOCK_EX);
 
         return $record['attempts'] <= $maxAttempts;
     }
@@ -177,16 +199,24 @@ class Security
     /**
      * Sanitize a string against null-byte poisoning, invisible control chars, and CRLF injection.
      */
-    public static function cleanString(mixed $val): string
+    public static function cleanString(mixed $val, bool $stripNewlines = true): string
     {
         if (!is_string($val)) {
             $val = (string) $val;
         }
 
-        // Strip null bytes and control chars (except normal tab, newline, carriage return)
-        $val = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $val);
+        // Sanitize invalid UTF-8 sequences to prevent preg_replace returning null & triggering deprecation
+        $val = mb_convert_encoding($val, 'UTF-8', 'UTF-8');
 
-        return trim($val);
+        if ($stripNewlines) {
+            // Strip null bytes, invisible control chars, and CRLF
+            $val = preg_replace('/[\x00-\x1F\x7F]/u', '', $val);
+        } else {
+            // Strip null bytes and control chars (except normal tab, newline, carriage return)
+            $val = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $val);
+        }
+
+        return trim((string) $val);
     }
 
     /**

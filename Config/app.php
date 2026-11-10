@@ -32,8 +32,11 @@ return [
     // Application Environment: 'development' or 'production'
     'env' => env('APP_ENV', 'development'),
 
-    // Debug Mode: true displays verbose errors; false renders clean 500 pages
-    'debug' => (bool) env('APP_DEBUG', true),
+    // Debug Mode: true displays verbose errors; false renders clean 500 pages (fail-closed for security)
+    'debug' => (bool) env('APP_DEBUG', false),
+
+    // Application Encryption Key (used by Core\Crypt for AES-256-GCM encryption & optional peppers)
+    'key' => env('APP_KEY', ''),
 
     // Base Application URL
     'base_url' => env('APP_BASE_URL', '/'),

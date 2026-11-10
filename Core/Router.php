@@ -236,16 +236,17 @@ class Router
         $path = self::$namedRoutes[$name]->getPath();
 
         // Parameter substitution e.g. /post/{id}
-        if (!empty($params)) {
+        if ($params !== [] && $params !== '' && $params !== null) {
             if (!is_array($params)) {
                 $params = ['id' => $params];
             }
 
             foreach ($params as $key => $val) {
+                $encodedVal = urlencode((string) $val);
                 if (str_contains($path, '{' . $key . '}')) {
-                    $path = str_replace('{' . $key . '}', (string) $val, $path);
+                    $path = str_replace('{' . $key . '}', $encodedVal, $path);
                 } else {
-                    $path = preg_replace('/\{[a-zA-Z0-9_]+\}/', (string) $val, $path, 1);
+                    $path = preg_replace('/\{[a-zA-Z0-9_]+\}/', $encodedVal, $path, 1);
                 }
             }
         }
@@ -260,16 +261,23 @@ class Router
     {
         $uri = Request::uri();
         $method = Request::method();
+        $allowedMethodsForUri = [];
 
         foreach (self::$routes as $route) {
-            if ($route->getMethod() !== '*' && $route->getMethod() !== $method) {
-                continue;
-            }
-
             $pattern = preg_replace('/\{([a-zA-Z0-9_]+)\}/', '([^/]+)', $route->getPath());
             $pattern = "#^" . $pattern . "$#";
 
             if (preg_match($pattern, $uri, $matches)) {
+                $routeMethod = $route->getMethod();
+
+                // HEAD requests should match GET routes according to RFC 9110
+                $methodMatches = ($routeMethod === '*' || $routeMethod === $method || ($method === 'HEAD' && $routeMethod === 'GET'));
+
+                if (!$methodMatches) {
+                    $allowedMethodsForUri[] = $routeMethod;
+                    continue;
+                }
+
                 array_shift($matches); // Remove full match
                 self::$currentRoute = $route;
 
@@ -279,6 +287,11 @@ class Router
                     return self::executeHandler($route->getHandler(), $matches);
                 };
 
+                // For HEAD requests, buffer and suppress output body while preserving headers
+                if ($method === 'HEAD') {
+                    ob_start();
+                }
+
                 // Run request through attached checkpoints
                 if (!empty($checkpoints)) {
                     $result = Checkpoint::run($checkpoints, $action);
@@ -286,11 +299,30 @@ class Router
                     $result = $action();
                 }
 
+                if ($method === 'HEAD') {
+                    ob_end_clean();
+                    return;
+                }
+
                 if (is_string($result)) {
                     Response::html($result);
                 }
                 return;
             }
+        }
+
+        // If URI matched under other HTTP methods, return 405 Method Not Allowed
+        if (!empty($allowedMethodsForUri)) {
+            $allowedList = array_unique($allowedMethodsForUri);
+            if (in_array('GET', $allowedList, true) && !in_array('HEAD', $allowedList, true)) {
+                $allowedList[] = 'HEAD';
+            }
+            $allowHeader = implode(', ', $allowedList);
+            if (!headers_sent()) {
+                header("Allow: {$allowHeader}");
+            }
+            Response::renderError(405, "Method {$method} not allowed for this route. Supported methods: {$allowHeader}.");
+            return;
         }
 
         // No match found -> handle 404

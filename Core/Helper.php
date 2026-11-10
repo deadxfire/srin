@@ -197,11 +197,16 @@ if (!function_exists('app_origin')) {
 
         $scheme = $isHttps ? 'https' : 'http';
 
-        // Host detection
+        // Host detection with strict header injection validation
         $host = $_SERVER['HTTP_X_FORWARDED_HOST'] ?? $_SERVER['HTTP_HOST'] ?? $_SERVER['SERVER_NAME'] ?? 'localhost:8000';
         if (str_contains($host, ',')) {
             $parts = explode(',', $host);
             $host = trim($parts[0]);
+        }
+
+        // Defend against Host Header Injection / XSS
+        if (!preg_match('/^[a-zA-Z0-9.\-:]+$/', $host)) {
+            $host = 'localhost:8000';
         }
 
         return "{$scheme}://{$host}" . $baseDir;
@@ -437,13 +442,31 @@ if (!function_exists('old')) {
     /**
      * Get old input value flashed from previous request.
      */
-    function old(string $key, string $default = ''): string
+    function old(string $key, mixed $default = ''): mixed
     {
-        if (session_status() === PHP_SESSION_NONE) {
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();
         }
 
-        return $_SESSION['_old'][$key] ?? $default;
+        $old = $_SESSION['_old'] ?? [];
+        if (array_key_exists($key, $old)) {
+            return $old[$key];
+        }
+
+        // Support dot notation safely: e.g. old('users.0')
+        if (str_contains($key, '.')) {
+            $current = $old;
+            foreach (explode('.', $key) as $segment) {
+                if (is_array($current) && array_key_exists($segment, $current)) {
+                    $current = $current[$segment];
+                } else {
+                    return $default;
+                }
+            }
+            return $current;
+        }
+
+        return $default;
     }
 }
 
@@ -453,12 +476,19 @@ if (!function_exists('flash_inputs')) {
      */
     function flash_inputs(array $inputs): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();
         }
 
-        // Do not preserve sensitive data like passwords
-        unset($inputs['_csrf'], $inputs['password']);
+        // Do not preserve sensitive data like passwords, tokens, or confirmations
+        unset(
+            $inputs['_csrf'],
+            $inputs['_token'],
+            $inputs['password'],
+            $inputs['password_confirmation'],
+            $inputs['current_password'],
+            $inputs['new_password']
+        );
         $_SESSION['_old'] = $inputs;
     }
 }
@@ -469,7 +499,7 @@ if (!function_exists('clear_old_inputs')) {
      */
     function clear_old_inputs(): void
     {
-        if (session_status() === PHP_SESSION_NONE) {
+        if (session_status() === PHP_SESSION_NONE && !headers_sent()) {
             session_start();
         }
 
@@ -696,6 +726,46 @@ if (!function_exists('log_debug')) {
     function log_debug(string $message, array $context = []): void
     {
         \Core\Log::debug($message, $context);
+    }
+}
+
+if (!function_exists('hash_password')) {
+    /**
+     * Hash a plain-text password using the configured powerful algorithm (Argon2id by default).
+     */
+    function hash_password(string $password, ?string $algo = null, array $options = []): string
+    {
+        return \Core\Auth::hash($password, $algo, $options);
+    }
+}
+
+if (!function_exists('verify_password')) {
+    /**
+     * Verify a plain-text password against a stored cryptographic hash.
+     */
+    function verify_password(string $password, string $hash): bool
+    {
+        return \Core\Auth::verify($password, $hash);
+    }
+}
+
+if (!function_exists('encrypt')) {
+    /**
+     * Encrypt a string using military-grade AES-256-GCM authenticated encryption.
+     */
+    function encrypt(string $value, ?string $key = null): string
+    {
+        return \Core\Crypt::encrypt($value, $key);
+    }
+}
+
+if (!function_exists('decrypt')) {
+    /**
+     * Decrypt an AES-256-GCM authenticated payload, returning null if invalid or tampered.
+     */
+    function decrypt(string $payload, ?string $key = null): ?string
+    {
+        return \Core\Crypt::decrypt($payload, $key);
     }
 }
 

@@ -276,14 +276,27 @@ class Igniter
             header_remove('X-Powered-By');
         }
 
-        // 3. Start Hardened Session
+        // 3. Configure Hardened Session Settings & Lazy Session Start
         if (session_status() === PHP_SESSION_NONE) {
             ini_set('session.cookie_httponly', '1');
             ini_set('session.use_only_cookies', '1');
-            if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+            ini_set('session.use_strict_mode', '1');
+            ini_set('session.cookie_samesite', 'Lax');
+
+            $isHttps = (!empty($_SERVER['HTTPS']) && strtolower((string) $_SERVER['HTTPS']) !== 'off')
+                || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_PROTO']) === 'https')
+                || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && strtolower((string) $_SERVER['HTTP_X_FORWARDED_SSL']) === 'on')
+                || (!empty($_SERVER['SERVER_PORT']) && (int) $_SERVER['SERVER_PORT'] === 443);
+
+            if ($isHttps) {
                 ini_set('session.cookie_secure', '1');
             }
-            session_start();
+
+            // Only resume session if client already sent a session cookie, avoiding disk spam on bot hits
+            $sessionCookieName = session_name();
+            if (!empty($_COOKIE[$sessionCookieName])) {
+                session_start();
+            }
         }
 
         // 4. Register class alias for BaseController
@@ -293,7 +306,7 @@ class Igniter
 
         // 5. Configure timezone and error reporting
         date_default_timezone_set(config('app.timezone', 'UTC'));
-        $isDebug = (bool) config('app.debug', true);
+        $isDebug = (bool) config('app.debug', false);
 
         if ($isDebug) {
             ini_set('display_errors', '1');

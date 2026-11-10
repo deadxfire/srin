@@ -50,14 +50,13 @@ class App
                 $value = substr($value, 1, -1);
             }
 
-            // Populate $_ENV, $_SERVER, and putenv
-            if (!array_key_exists($key, $_ENV)) {
+            // Populate $_ENV, $_SERVER, and putenv only if not already set by system/server environment
+            $hasExisting = array_key_exists($key, $_ENV) || array_key_exists($key, $_SERVER) || getenv($key) !== false;
+            if (!$hasExisting) {
                 $_ENV[$key] = $value;
-            }
-            if (!array_key_exists($key, $_SERVER)) {
                 $_SERVER[$key] = $value;
+                putenv("{$key}={$value}");
             }
-            putenv("{$key}={$value}");
         }
     }
 

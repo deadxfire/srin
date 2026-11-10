@@ -157,9 +157,11 @@ class Auth
     {
         self::startSession();
 
-        if (!headers_sent()) {
-            @session_regenerate_id(true);
+        if (headers_sent()) {
+            throw new \RuntimeException("Cannot regenerate session ID during login: HTTP headers have already been sent.");
         }
+
+        session_regenerate_id(true);
 
         $sessionKey = self::getSessionKey();
         $primaryKey = $user->id ?? null;
@@ -208,12 +210,36 @@ class Auth
         $user = $query->first();
 
         if (!$user || $plainPassword === null) {
+            // Timing equalization against user enumeration: perform dummy hash verification
+            self::verify($plainPassword ?? '', '$argon2id$v=19$m=65536,t=3,p=1$c29tZXNhbHQAAAAAAAAAAA$dummyhashplaceholderxxxxxxxxxxxxxxxxxxxxxxx');
             return false;
         }
 
         $storedHash = (string) ($user->{$passwordCol} ?? '');
 
         if (self::verify($plainPassword, $storedHash)) {
+            // Automatic zero-downtime password hash upgrade (e.g. from Bcrypt to Argon2id or when cost/pepper changes)
+            $autoRehash = function_exists('config') ? (bool) config('auth.hash.auto_rehash', true) : true;
+            if ($autoRehash) {
+                $hasPepper = self::getPepper() !== '';
+                $isPeppered = password_verify(self::pepperPassword($plainPassword), $storedHash);
+                $needsRehash = self::needsRehash($storedHash) || ($hasPepper && !$isPeppered);
+
+                if ($needsRehash) {
+                    $newHash = self::hash($plainPassword);
+                    $user->{$passwordCol} = $newHash;
+                    if (method_exists($user, 'save')) {
+                        try {
+                            $user->save();
+                        } catch (\Throwable $e) {
+                            if (function_exists('log_warning')) {
+                                log_warning('Failed to auto-upgrade password hash: ' . $e->getMessage());
+                            }
+                        }
+                    }
+                }
+            }
+
             self::login($user);
             return true;
         }
@@ -223,7 +249,7 @@ class Auth
 
     /**
      * Log the user out of the application.
-     * Regenerates session ID and purges session key.
+     * Regenerates session ID, invalidates CSRF token, and purges session data.
      */
     public static function logout(): void
     {
@@ -232,6 +258,10 @@ class Auth
         $sessionKey = self::getSessionKey();
         unset($_SESSION[$sessionKey]);
         self::$cachedUser = null;
+
+        // Rotate and invalidate CSRF token & clear session
+        Security::regenerateCsrfToken();
+        $_SESSION = [];
 
         if (!headers_sent()) {
             @session_regenerate_id(true);
@@ -248,19 +278,142 @@ class Auth
     }
 
     /**
-     * Hash a plain-text password using modern, secure algorithm.
+     * Resolve the configured password hashing algorithm.
+     * Defaults to PASSWORD_ARGON2ID when supported, or PASSWORD_BCRYPT.
      */
-    public static function hash(string $password): string
+    public static function getHashAlgorithm(): string
     {
-        return password_hash($password, PASSWORD_DEFAULT);
+        $algo = function_exists('config') ? (string) config('auth.hash.algorithm', 'argon2id') : 'argon2id';
+        $algo = strtolower(trim($algo));
+
+        if (($algo === 'argon2id' || $algo === 'argon') && defined('PASSWORD_ARGON2ID')) {
+            return PASSWORD_ARGON2ID;
+        }
+        if ($algo === 'argon2i' && defined('PASSWORD_ARGON2I')) {
+            return PASSWORD_ARGON2I;
+        }
+        if ($algo === 'bcrypt' && defined('PASSWORD_BCRYPT')) {
+            return PASSWORD_BCRYPT;
+        }
+
+        return defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
     }
 
     /**
-     * Verify a plain-text password against a stored hash.
+     * Resolve options for the configured hashing algorithm.
+     */
+    public static function getHashOptions(?string $algo = null): array
+    {
+        $algo = $algo ?? self::getHashAlgorithm();
+
+        if ($algo === (defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : '') ||
+            $algo === (defined('PASSWORD_ARGON2I') ? PASSWORD_ARGON2I : '')) {
+            $memory = function_exists('config') ? (int) config('auth.hash.argon2id.memory_cost', 65536) : 65536;
+            $time = function_exists('config') ? (int) config('auth.hash.argon2id.time_cost', 3) : 3;
+            $threads = function_exists('config') ? (int) config('auth.hash.argon2id.threads', 1) : 1;
+
+            return [
+                'memory_cost' => $memory > 0 ? $memory : 65536,
+                'time_cost'   => $time > 0 ? $time : 3,
+                'threads'     => $threads > 0 ? $threads : 1,
+            ];
+        }
+
+        if ($algo === (defined('PASSWORD_BCRYPT') ? PASSWORD_BCRYPT : '')) {
+            $cost = function_exists('config') ? (int) config('auth.hash.bcrypt.cost', 12) : 12;
+            return ['cost' => max(4, min(31, $cost))];
+        }
+
+        return [];
+    }
+
+    /**
+     * Retrieve the configured application pepper (keyed hashing secret).
+     */
+    public static function getPepper(): string
+    {
+        if (function_exists('config')) {
+            $pepper = (string) config('auth.hash.pepper', '');
+            if ($pepper !== '') {
+                return $pepper;
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Apply the application pepper to a plain-text password using HMAC-SHA256.
+     * Prevents offline brute-force attacks even if the database is leaked.
+     */
+    public static function pepperPassword(string $password): string
+    {
+        $pepper = self::getPepper();
+        if ($pepper === '') {
+            return $password;
+        }
+        return hash_hmac('sha256', $password, $pepper);
+    }
+
+    /**
+     * Hash a plain-text password using the configured powerful algorithm (Argon2id by default).
+     *
+     * @param string      $password Plain-text password to hash
+     * @param string|null $algo     Optional algorithm override
+     * @param array       $options  Optional algorithm options override
+     * @return string Cryptographic hash string
+     */
+    public static function hash(string $password, ?string $algo = null, array $options = []): string
+    {
+        $algorithm = $algo ?? self::getHashAlgorithm();
+        $opts = !empty($options) ? $options : self::getHashOptions($algorithm);
+        $prepared = self::pepperPassword($password);
+
+        return password_hash($prepared, $algorithm, $opts);
+    }
+
+    /**
+     * Verify a plain-text password against a stored hash with backward compatibility.
+     *
+     * @param string $password Plain-text password
+     * @param string $hash     Stored hash string
+     * @return bool True if valid, false otherwise
      */
     public static function verify(string $password, string $hash): bool
     {
-        return password_verify($password, $hash);
+        if ($hash === '') {
+            return false;
+        }
+
+        // 1. Check with configured pepper
+        $peppered = self::pepperPassword($password);
+        if (password_verify($peppered, $hash)) {
+            return true;
+        }
+
+        // 2. Fallback check without pepper (backwards compatibility for existing users)
+        if ($peppered !== $password && password_verify($password, $hash)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if a stored hash needs to be re-hashed to match modern algorithm or cost.
+     *
+     * @param string $hash Stored hash string
+     * @return bool True if rehash needed
+     */
+    public static function needsRehash(string $hash): bool
+    {
+        if ($hash === '') {
+            return true;
+        }
+
+        $algo = self::getHashAlgorithm();
+        $opts = self::getHashOptions($algo);
+
+        return password_needs_rehash($hash, $algo, $opts);
     }
 }
 

@@ -8,6 +8,10 @@ database/*.sqlite-journal
 # Mail logs
 Others/logs/*.log
 
+# Cache & temporary files
+Others/cache/
+Others/temp/
+
 # IDE files
 .vscode/
 .idea/

@@ -127,6 +127,13 @@ class Mailer
         ?string $replyTo,
         bool $isHtml
     ): array {
+        // Sanitize header fields against CRLF injection / Bcc injection
+        $fromEmail = str_replace(["\r", "\n"], '', $fromEmail);
+        $fromName  = str_replace(["\r", "\n"], '', $fromName);
+        $to        = str_replace(["\r", "\n"], '', $to);
+        $subject   = str_replace(["\r", "\n"], '', $subject);
+        $replyTo   = $replyTo !== null ? str_replace(["\r", "\n"], '', $replyTo) : null;
+
         $headers = [];
         $headers[] = 'MIME-Version: 1.0';
         $headers[] = $isHtml ? 'Content-type: text/html; charset=UTF-8' : 'Content-type: text/plain; charset=UTF-8';
@@ -158,9 +165,16 @@ class Mailer
         string $fromName,
         ?string $replyTo
     ): array {
+        // Sanitize header values against log injection
+        $fromEmail = str_replace(["\r", "\n"], '', $fromEmail);
+        $fromName  = str_replace(["\r", "\n"], '', $fromName);
+        $to        = str_replace(["\r", "\n"], '', $to);
+        $subject   = str_replace(["\r", "\n"], '', $subject);
+        $replyTo   = $replyTo !== null ? str_replace(["\r", "\n"], '', $replyTo) : null;
+
         $logDir = dirname(__DIR__) . '/Others/logs';
         if (!is_dir($logDir)) {
-            @mkdir($logDir, 0777, true);
+            @mkdir($logDir, 0750, true);
         }
 
         $logFile = $logDir . '/mail.log';

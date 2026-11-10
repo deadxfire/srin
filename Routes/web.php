@@ -36,7 +36,6 @@ Router::get('/api/status', function() {
         'engine' => 'Srin Engine',
         'developer' => 'Arindam Makar',
         'github' => 'https://github.com/deadxfire',
-        'php_version' => PHP_VERSION,
         'timestamp' => time(),
     ]);
 })->name('api.status');

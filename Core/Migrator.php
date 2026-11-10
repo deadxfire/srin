@@ -173,8 +173,17 @@ class Migrator
             if ($dbPath !== ':memory:' && file_exists($dbPath)) {
                 @unlink($dbPath);
             }
+        } elseif ($driver === 'pgsql') {
+            // PostgreSQL: query information_schema for user tables
+            $tables = Database::select("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'");
+            if (!empty($tables)) {
+                foreach ($tables as $t) {
+                    $tableName = reset($t);
+                    Database::statement("DROP TABLE IF EXISTS \"{$tableName}\" CASCADE;");
+                }
+            }
         } else {
-            // Drop known tables
+            // MySQL / MariaDB: drop known tables with foreign key checks toggled
             $tables = Database::select("SHOW TABLES");
             if (!empty($tables)) {
                 Database::statement("SET FOREIGN_KEY_CHECKS = 0;");
@@ -240,8 +249,8 @@ class Migrator
      */
     protected function getLastBatchNumber(): int
     {
-        $row = Database::select("SELECT MAX(`batch`) as max_batch FROM `{$this->table}`");
-        return (int) ($row[0]['max_batch'] ?? 0);
+        $max = Database::table($this->table)->max('batch');
+        return (int) ($max ?? 0);
     }
 
     /**

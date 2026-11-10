@@ -191,22 +191,52 @@ class BaseController
         $originalName = (string) ($file['name'] ?? '');
         $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
 
-        if (!empty($allowedExtensions)) {
-            $allowed = array_map('strtolower', $allowedExtensions);
-            if (!in_array($ext, $allowed, true)) {
-                return null;
-            }
+        // Always block dangerous executable scripts
+        $blockedExtensions = [
+            'php', 'php3', 'php4', 'php5', 'php7', 'php8', 'phtml', 'phar', 'phps', 'pht',
+            'inc', 'cgi', 'pl', 'exe', 'sh', 'bash', 'bat', 'cmd', 'htaccess', 'htpasswd', 'config'
+        ];
+        if ($ext === '' || in_array($ext, $blockedExtensions, true)) {
+            return null;
+        }
+
+        // Safe default allowed extensions when none explicitly configured
+        $defaultAllowed = [
+            'jpg', 'jpeg', 'png', 'gif', 'svg', 'webp', 'bmp', 'ico',
+            'pdf', 'txt', 'csv', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+            'zip', 'rar', 'tar', 'gz', 'mp3', 'wav', 'mp4', 'webm'
+        ];
+
+        $allowed = !empty($allowedExtensions)
+            ? array_map('strtolower', $allowedExtensions)
+            : $defaultAllowed;
+
+        if (!in_array($ext, $allowed, true)) {
+            return null;
         }
 
         $baseDir = dirname(__DIR__);
-        $cleanDir = trim(str_replace(['\\', '../', '..\\'], ['/', '', ''], $destinationDir), '/');
+        // Recursively strip directory traversal sequences
+        do {
+            $destinationDir = str_replace(['../', '..\\'], '', $destinationDir, $count);
+        } while ($count > 0);
+
+        $cleanDir = trim(str_replace(['\\', '/'], '/', $destinationDir), '/');
+        // Prevent leading/trailing dot shenanigans
+        $cleanDir = preg_replace('#^(\.+/)+#', '', $cleanDir);
         $targetPath = $baseDir . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $cleanDir);
 
         if (!is_dir($targetPath)) {
             mkdir($targetPath, 0755, true);
         }
 
-        $safeName = bin2hex(random_bytes(16)) . ($ext !== '' ? '.' . $ext : '');
+        // Ensure .htaccess disables PHP script execution inside upload directory
+        $htaccessPath = $targetPath . DIRECTORY_SEPARATOR . '.htaccess';
+        if (!file_exists($htaccessPath)) {
+            @file_put_contents($htaccessPath, "<FilesMatch \"\\.(php[0-9]?|phtml|phar|phps)$\">\n    Order Deny,Allow\n    Deny from all\n</FilesMatch>\nphp_flag engine off\n");
+        }
+
+        $safeName = bin2hex(random_bytes(16)) . '.' . $ext;
         $destination = $targetPath . DIRECTORY_SEPARATOR . $safeName;
 
         if (move_uploaded_file($file['tmp_name'], $destination)) {
@@ -433,28 +463,47 @@ class BaseController
                 }
 
                 // url
-                if ($rule === 'url' && !filter_var($value, FILTER_VALIDATE_URL)) {
-                    $errors[$field] = 'Please provide a valid URL.';
-                    break;
+                if ($rule === 'url') {
+                    $scheme = parse_url((string) $value, PHP_URL_SCHEME);
+                    if (!filter_var($value, FILTER_VALIDATE_URL) || !in_array(strtolower((string) $scheme), ['http', 'https'], true)) {
+                        $errors[$field] = 'Please provide a valid URL.';
+                        break;
+                    }
                 }
 
                 // min:N
                 if (str_starts_with($rule, 'min:')) {
-                    $min = (int) substr($rule, 4);
-                    $len = is_string($value) ? mb_strlen($value) : $value;
-                    if ($len < $min) {
-                        $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " must be at least {$min} characters.";
-                        break;
+                    $min = (float) substr($rule, 4);
+                    $isNumeric = in_array('numeric', $ruleList, true) || is_numeric($value);
+                    if ($isNumeric) {
+                        if ((float) $value < $min) {
+                            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " must be at least {$min}.";
+                            break;
+                        }
+                    } else {
+                        $len = mb_strlen((string) $value);
+                        if ($len < (int) $min) {
+                            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " must be at least " . (int)$min . " characters.";
+                            break;
+                        }
                     }
                 }
 
                 // max:N
                 if (str_starts_with($rule, 'max:')) {
-                    $max = (int) substr($rule, 4);
-                    $len = is_string($value) ? mb_strlen($value) : $value;
-                    if ($len > $max) {
-                        $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " cannot exceed {$max} characters.";
-                        break;
+                    $max = (float) substr($rule, 4);
+                    $isNumeric = in_array('numeric', $ruleList, true) || is_numeric($value);
+                    if ($isNumeric) {
+                        if ((float) $value > $max) {
+                            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " cannot exceed {$max}.";
+                            break;
+                        }
+                    } else {
+                        $len = mb_strlen((string) $value);
+                        if ($len > (int) $max) {
+                            $errors[$field] = ucfirst(str_replace('_', ' ', $field)) . " cannot exceed " . (int)$max . " characters.";
+                            break;
+                        }
                     }
                 }
 
@@ -514,8 +563,12 @@ class BaseController
             $this->rateLimit($throttleKey, $maxAttempts, $decaySeconds);
         }
 
-        // 2. Automated security verification on mutations
-        if ($this->isPost()) {
+        // 2. Automated security verification on mutations (handles POST and spoofed PUT/PATCH/DELETE)
+        $isMutation = $this->isPost()
+            || in_array(Request::method(), ['POST', 'PUT', 'PATCH', 'DELETE'], true)
+            || strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST';
+
+        if ($isMutation) {
             $this->validateCsrf();
             $this->validateHoneypot();
         }
@@ -534,6 +587,14 @@ class BaseController
                 $rules[$key] = is_array($rule) ? implode('|', $rule) : (string) $rule;
             }
         }
+
+        // Auto-whitelist confirmation fields (e.g. password_confirmation for confirmed rule)
+        foreach ($rules as $field => $ruleString) {
+            if (str_contains($ruleString, 'confirmed')) {
+                $allowedKeys[] = $field . '_confirmation';
+            }
+        }
+        $allowedKeys = array_values(array_unique($allowedKeys));
 
         // 4. Extract only allowed inputs (mass-assignment protection)
         $data = $this->onlyInputs($allowedKeys);

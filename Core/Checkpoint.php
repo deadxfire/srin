@@ -110,13 +110,13 @@ abstract class Checkpoint
 
             $status = $instance->enter();
 
-            // If checkpoint returned false, an abort/redirect was already sent or blocked
-            if ($status === false) {
+            // If checkpoint returned false or null, halt execution (strict deny by default)
+            if ($status === false || $status === null) {
                 return null;
             }
 
             // If checkpoint returned a redirect string, Response object, or HTML string
-            if ($status !== true && $status !== null) {
+            if ($status !== true) {
                 return $status;
             }
         }

@@ -45,6 +45,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
     protected array $guarded = ['id'];
 
     /**
+     * Attributes hidden from array / JSON serialization.
+     *
+     * @var array<string>
+     */
+    protected array $hidden = [];
+
+    /**
      * The model's attributes.
      */
     protected array $attributes = [];
@@ -376,8 +383,20 @@ abstract class Model implements ArrayAccess, JsonSerializable
      */
     public static function modify(int|string|array $idOrCriteria, array $attributes): bool
     {
+        $dummy = new static();
+        $safeAttributes = [];
+        foreach ($attributes as $key => $val) {
+            if ($dummy->isFillable($key)) {
+                $safeAttributes[$key] = $val;
+            }
+        }
+
+        if (empty($safeAttributes)) {
+            return false;
+        }
+
         if (is_array($idOrCriteria)) {
-            return static::fetch($idOrCriteria)->update($attributes) >= 0;
+            return static::fetch($idOrCriteria)->update($safeAttributes) >= 0;
         }
 
         $record = static::find($idOrCriteria);
@@ -385,16 +404,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
             return false;
         }
 
-        return $record->update($attributes);
-    }
-
-    /**
-     * Remove the current model instance from the database.
-     * Expressive Srin alternative to delete().
-     */
-    public function remove(): bool
-    {
-        return $this->delete();
+        return $record->update($safeAttributes);
     }
 
     /**
@@ -481,9 +491,21 @@ abstract class Model implements ArrayAccess, JsonSerializable
         $now = date('Y-m-d H:i:s');
 
         if ($this->exists) {
-            // Update existing record
+            // Update existing record: only update dirty (changed) attributes
+            $dirty = [];
+            foreach ($this->attributes as $key => $val) {
+                if (!array_key_exists($key, $this->original) || $this->original[$key] !== $val) {
+                    $dirty[$key] = $val;
+                }
+            }
+
+            if (empty($dirty)) {
+                return true; // No changes to persist
+            }
+
             if ($this->timestamps) {
                 $this->attributes['updated_at'] = $now;
+                $dirty['updated_at'] = $now;
             }
 
             $id = $this->attributes[$pk] ?? null;
@@ -491,7 +513,7 @@ abstract class Model implements ArrayAccess, JsonSerializable
                 throw new Exception("Cannot update model without primary key [{$pk}].");
             }
 
-            $affected = static::query()->where($pk, $id)->update($this->attributes);
+            $affected = static::query()->where($pk, $id)->update($dirty);
             $this->original = $this->attributes;
             return $affected >= 0;
         }
@@ -684,6 +706,13 @@ abstract class Model implements ArrayAccess, JsonSerializable
     {
         $attributes = $this->attributes;
 
+        // Strip hidden attributes (e.g. password, remember_token)
+        if (!empty($this->hidden)) {
+            foreach ($this->hidden as $hiddenKey) {
+                unset($attributes[$hiddenKey]);
+            }
+        }
+
         foreach ($this->relations as $name => $relation) {
             if (is_array($relation)) {
                 $attributes[$name] = array_map(fn($item) => $item instanceof Model ? $item->toArray() : $item, $relation);
@@ -714,7 +743,20 @@ abstract class Model implements ArrayAccess, JsonSerializable
     }
 
     /**
+     * Forward dynamic instance method calls to query builder or handle aliases.
+     */
+    public function __call(string $method, array $parameters): mixed
+    {
+        if ($method === 'remove') {
+            return $this->delete();
+        }
+
+        return static::query()->$method(...$parameters);
+    }
+
+    /**
      * Magic property getter with lazy-loading relationship support.
+     * Prevents arbitrary method execution (e.g. $model->delete).
      */
     public function __get(string $key): mixed
     {
@@ -727,11 +769,15 @@ abstract class Model implements ArrayAccess, JsonSerializable
         }
 
         if (method_exists($this, $key)) {
-            $relation = $this->$key();
-            if ($relation instanceof Relation) {
-                $results = $relation->getResults();
-                $this->relations[$key] = $results;
-                return $results;
+            $ref = new \ReflectionMethod($this, $key);
+            // Strictly disallow executing methods defined on base Core\Model class (e.g. delete, save, etc.)
+            if ($ref->isPublic() && $ref->getDeclaringClass()->getName() !== self::class && $ref->getNumberOfRequiredParameters() === 0) {
+                $relation = $this->$key();
+                if ($relation instanceof Relation) {
+                    $results = $relation->getResults();
+                    $this->relations[$key] = $results;
+                    return $results;
+                }
             }
         }
 
