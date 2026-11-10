@@ -199,27 +199,48 @@ class Request
      */
     public static function ip(): string
     {
-        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
-        $trusted = function_exists('config') ? config('app.trusted_proxies', []) : [];
-        if (!is_array($trusted) && is_string($trusted) && $trusted !== '') {
-            $trusted = array_map('trim', explode(',', $trusted));
+        $remoteAddr = trim((string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1'));
+        if (!filter_var($remoteAddr, FILTER_VALIDATE_IP)) {
+            $remoteAddr = '127.0.0.1';
         }
 
-        // Only trust X-Forwarded-For if request came from a trusted reverse proxy
-        if (!empty($trusted) && in_array($remoteAddr, (array) $trusted, true)) {
-            $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? null;
-            if ($forwarded) {
-                if (str_contains($forwarded, ',')) {
-                    $parts = explode(',', $forwarded);
-                    $forwarded = trim($parts[0]);
-                }
-                if (filter_var($forwarded, FILTER_VALIDATE_IP)) {
-                    return $forwarded;
+        $rawTrusted = '';
+        if (function_exists('config')) {
+            $rawTrusted = config('app.trusted_proxies', '');
+        }
+        if (empty($rawTrusted) && function_exists('env')) {
+            $rawTrusted = env('APP_TRUSTED_PROXIES', '');
+        }
+        if (empty($rawTrusted) && isset($_SERVER['APP_TRUSTED_PROXIES'])) {
+            $rawTrusted = $_SERVER['APP_TRUSTED_PROXIES'];
+        }
+
+        $trustedProxies = [];
+        if (is_array($rawTrusted)) {
+            $trustedProxies = array_filter(array_map('trim', $rawTrusted));
+        } elseif (is_string($rawTrusted) && $rawTrusted !== '') {
+            $trustedProxies = array_filter(array_map('trim', explode(',', $rawTrusted)));
+        }
+
+        // Only trust X-Forwarded-For if REMOTE_ADDR (the immediate peer) is listed in APP_TRUSTED_PROXIES
+        if (!empty($trustedProxies) && in_array($remoteAddr, $trustedProxies, true)) {
+            $forwarded = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+            if (is_string($forwarded) && $forwarded !== '') {
+                $hops = array_filter(array_map('trim', explode(',', $forwarded)));
+                // Inspect from right to left (closest proxy to client) to take the right-most non-trusted hop
+                $reversed = array_reverse($hops);
+                foreach ($reversed as $hop) {
+                    if (!filter_var($hop, FILTER_VALIDATE_IP)) {
+                        continue;
+                    }
+                    if (!in_array($hop, $trustedProxies, true)) {
+                        return $hop;
+                    }
                 }
             }
         }
 
-        return filter_var($remoteAddr, FILTER_VALIDATE_IP) ? $remoteAddr : '127.0.0.1';
+        return $remoteAddr;
     }
 
     /**

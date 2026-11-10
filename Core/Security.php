@@ -151,50 +151,72 @@ class Security
      */
     public static function rateLimit(string $key, int $maxAttempts = 5, int $decaySeconds = 60): bool
     {
-        $ip = Request::ip();
-        $rateKey = md5($key . '|' . $ip);
-        $cacheDir = dirname(__DIR__) . '/Others/cache/rates';
-        if (!is_dir($cacheDir)) {
-            @mkdir($cacheDir, 0750, true);
-        }
-
-        $cacheFile = $cacheDir . '/' . $rateKey . '.json';
-        $now = time();
-
-        $fp = @fopen($cacheFile, 'c+');
-        if ($fp === false) {
-            return true;
-        }
-
-        flock($fp, LOCK_EX);
-
-        $contents = stream_get_contents($fp);
-        $record = ['attempts' => 0, 'reset' => $now + $decaySeconds];
-        if (!empty($contents)) {
-            $data = json_decode($contents, true);
-            if (is_array($data) && isset($data['attempts'], $data['reset'])) {
-                $record = $data;
+        try {
+            $ip = Request::ip();
+            $rateKey = hash('sha256', $key . '|' . $ip);
+            $cacheDir = sys_get_temp_dir() . '/srin_rates';
+            if (!is_dir($cacheDir)) {
+                if (!@mkdir($cacheDir, 0700, true) && !is_dir($cacheDir)) {
+                    return true; // Fail open if storage is unavailable
+                }
             }
+
+            // Opportunistic cleanup of expired rate limit files (~1% of requests)
+            if (random_int(1, 100) === 1) {
+                $nowTs = time();
+                $files = @glob($cacheDir . '/*.json');
+                if (is_array($files)) {
+                    foreach ($files as $file) {
+                        if (@filemtime($file) < ($nowTs - $decaySeconds)) {
+                            @unlink($file);
+                        }
+                    }
+                }
+            }
+
+            $cacheFile = $cacheDir . '/' . $rateKey . '.json';
+            $now = time();
+
+            $fp = @fopen($cacheFile, 'c+');
+            if ($fp === false) {
+                return true; // Fail open if storage is unavailable
+            }
+
+            if (!flock($fp, LOCK_EX)) {
+                fclose($fp);
+                return true; // Fail open
+            }
+
+            $contents = stream_get_contents($fp);
+            $record = ['attempts' => 0, 'reset' => $now + $decaySeconds];
+            if (!empty($contents)) {
+                $data = json_decode($contents, true);
+                if (is_array($data) && isset($data['attempts'], $data['reset'])) {
+                    $record = $data;
+                }
+            }
+
+            // Reset if window expired
+            if ($now > $record['reset']) {
+                $record = ['attempts' => 1, 'reset' => $now + $decaySeconds];
+                $allowed = true;
+            } else {
+                // Increment attempt
+                $record['attempts']++;
+                $allowed = $record['attempts'] <= $maxAttempts;
+            }
+
+            ftruncate($fp, 0);
+            rewind($fp);
+            fwrite($fp, json_encode($record));
+            fflush($fp);
+            flock($fp, LOCK_UN);
+            fclose($fp);
+
+            return $allowed;
+        } catch (\Throwable $e) {
+            return true; // Fail open
         }
-
-        // Reset if window expired
-        if ($now > $record['reset']) {
-            $record = ['attempts' => 1, 'reset' => $now + $decaySeconds];
-            $allowed = true;
-        } else {
-            // Increment attempt
-            $record['attempts']++;
-            $allowed = $record['attempts'] <= $maxAttempts;
-        }
-
-        ftruncate($fp, 0);
-        rewind($fp);
-        fwrite($fp, json_encode($record));
-        fflush($fp);
-        flock($fp, LOCK_UN);
-        fclose($fp);
-
-        return $allowed;
     }
 
     /**

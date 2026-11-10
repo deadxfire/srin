@@ -41,6 +41,9 @@ return [
     // Base Application URL (for reverse proxies or CDNs, configure APP_BASE_URL to canonical domain)
     'base_url' => env('APP_BASE_URL', '/'),
 
+    // Comma-separated list or array of trusted reverse proxy IP addresses
+    'trusted_proxies' => env('APP_TRUSTED_PROXIES', ''),
+
     // Default Application Timezone
     'timezone' => env('APP_TIMEZONE', 'Asia/Kolkata'),
 
