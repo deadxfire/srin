@@ -24,8 +24,8 @@ class Route
 
     /**
      * Attach one or more checkpoints (gates) to this route.
-     * Example: Router::get('/admin', 'Admin@index')->checkpoint('auth');
-     * Example: Router::get('/reports', 'Report@index')->checkpoint(['auth', 'admin']);
+     * Example: getlink('/admin', 'Admin@index')->checkpoint('auth');
+     * Example: getlink('/reports', 'Report@index')->checkpoint(['auth', 'admin']);
      */
     public function checkpoint(string|array $checkpoints): self
     {
@@ -46,7 +46,7 @@ class Route
 
     /**
      * Assign a unique name to this route.
-     * Example: Router::get('/about', 'HomeController@about')->name('about');
+     * Example: getlink('/about', 'HomeController@about')->name('about');
      */
     public function name(string $name): self
     {

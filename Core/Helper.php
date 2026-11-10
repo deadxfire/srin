@@ -350,6 +350,153 @@ if (!function_exists('route')) {
     }
 }
 
+if (!function_exists('getlink')) {
+    /**
+     * Register a GET route link.
+     *
+     * Example:
+     *   getlink('/', 'HomeController@index')->name('home');
+     */
+    function getlink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::get($path, $handler, $name);
+    }
+}
+
+if (!function_exists('getLink')) {
+    function getLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::get($path, $handler, $name);
+    }
+}
+
+if (!function_exists('postlink')) {
+    /**
+     * Register a POST route link.
+     *
+     * Example:
+     *   postlink('/submit', 'FormController@submit')->name('form.submit');
+     */
+    function postlink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::post($path, $handler, $name);
+    }
+}
+
+if (!function_exists('postLink')) {
+    function postLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::post($path, $handler, $name);
+    }
+}
+
+if (!function_exists('putlink')) {
+    /**
+     * Register a PUT route link.
+     */
+    function putlink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::put($path, $handler, $name);
+    }
+}
+
+if (!function_exists('putLink')) {
+    function putLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::put($path, $handler, $name);
+    }
+}
+
+if (!function_exists('deletelink')) {
+    /**
+     * Register a DELETE route link.
+     */
+    function deletelink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::delete($path, $handler, $name);
+    }
+}
+
+if (!function_exists('deleteLink')) {
+    function deleteLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::delete($path, $handler, $name);
+    }
+}
+
+if (!function_exists('patchlink')) {
+    /**
+     * Register a PATCH route link.
+     */
+    function patchlink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::patch($path, $handler, $name);
+    }
+}
+
+if (!function_exists('patchLink')) {
+    function patchLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::patch($path, $handler, $name);
+    }
+}
+
+if (!function_exists('optionslink')) {
+    /**
+     * Register an OPTIONS route link.
+     */
+    function optionslink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::options($path, $handler, $name);
+    }
+}
+
+if (!function_exists('optionsLink')) {
+    function optionsLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::options($path, $handler, $name);
+    }
+}
+
+if (!function_exists('anylink')) {
+    /**
+     * Register a route link responding to any HTTP verb.
+     */
+    function anylink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::any($path, $handler, $name);
+    }
+}
+
+if (!function_exists('anyLink')) {
+    function anyLink(string $path, mixed $handler, ?string $name = null): \Core\Route
+    {
+        return \Core\Link::any($path, $handler, $name);
+    }
+}
+
+if (!function_exists('grouplink')) {
+    /**
+     * Register a group of route links sharing attributes.
+     *
+     * Example:
+     *   grouplink(['prefix' => '/admin', 'checkpoint' => 'auth'], function() {
+     *       getlink('/dashboard', 'AdminController@dashboard');
+     *   });
+     */
+    function grouplink(array $attributes, \Closure $callback): void
+    {
+        \Core\Link::group($attributes, $callback);
+    }
+}
+
+if (!function_exists('groupLink')) {
+    function groupLink(array $attributes, \Closure $callback): void
+    {
+        \Core\Link::group($attributes, $callback);
+    }
+}
+
 if (!function_exists('csrf_token')) {
     /**
      * Retrieve or generate CSRF token.

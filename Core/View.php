@@ -359,11 +359,10 @@ class View
 
             if ($tagOffset !== -1 && $tagOffset + 1 < $len) {
                 $next2 = $template[$tagOffset] . $template[$tagOffset + 1];
-                if ($next2 === '[[' || $next2 === '[{' || $next2 === '{{') {
+                if ($next2 === '[[' || $next2 === '[{') {
                     $closeType = match ($next2) {
                         '[[' => ']]',
                         '[{' => '}]',
-                        '{{' => '}}',
                     };
                     $j = $tagOffset + 2;
                     $depth = 0;
@@ -418,25 +417,6 @@ class View
                                     $depth++;
                                 } elseif ($c === '}') {
                                     if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === ']') {
-                                        $matched = true;
-                                        $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
-                                        $escapedContent = $isDoubleAt
-                                            ? '@' . substr($template, $tagOffset, ($j + 2) - $tagOffset)
-                                            : substr($template, $tagOffset, ($j + 2) - $tagOffset);
-                                        $escapedTokens[$token] = $escapedContent;
-                                        $result .= $token;
-                                        $i = $j + 2;
-                                        break;
-                                    }
-                                    if ($depth > 0) {
-                                        $depth--;
-                                    }
-                                }
-                            } elseif ($closeType === '}}') {
-                                if ($c === '{') {
-                                    $depth++;
-                                } elseif ($c === '}') {
-                                    if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === '}') {
                                         $matched = true;
                                         $token = '%%ESCAPED_TOKENS_' . count($escapedTokens) . '%%';
                                         $escapedContent = $isDoubleAt
@@ -549,53 +529,7 @@ class View
                 }
             }
 
-            // 4. Double braces safe output alias: {{ $expression }}
-            if ($i + 1 < $len && $template[$i] === '{' && $template[$i + 1] === '{') {
-                $j = $i + 2;
-                $depth = 0;
-                $inSingle = false;
-                $inDouble = false;
-                $matched = false;
 
-                while ($j < $len) {
-                    $c = $template[$j];
-                    if ($inSingle) {
-                        if ($c === '\\') { $j += 2; continue; }
-                        if ($c === "'") { $inSingle = false; }
-                    } elseif ($inDouble) {
-                        if ($c === '\\') { $j += 2; continue; }
-                        if ($c === '"') { $inDouble = false; }
-                    } else {
-                        if ($c === "'") { $inSingle = true; }
-                        elseif ($c === '"') { $inDouble = true; }
-                        elseif ($c === '{') { $depth++; }
-                        elseif ($c === '}') {
-                            if ($depth === 0 && $j + 1 < $len && $template[$j + 1] === '}') {
-                                $matched = true;
-                                $expr = trim(substr($template, $i + 2, $j - ($i + 2)));
-                                if ($expr === '') {
-                                    $result .= '{{ }}';
-                                } else {
-                                    $expr = rtrim($expr, ';');
-                                    if (preg_match('/^(?:csrf_field|honeypot_field)\s*\(.*?\)$/i', $expr)) {
-                                        $result .= "<?= {$expr} ?>";
-                                    } else {
-                                        $result .= "<?= htmlspecialchars((string)({$expr}), ENT_QUOTES, 'UTF-8') ?>";
-                                    }
-                                }
-                                $i = $j + 2;
-                                break;
-                            }
-                            if ($depth > 0) { $depth--; }
-                        }
-                    }
-                    $j++;
-                }
-
-                if ($matched) {
-                    continue;
-                }
-            }
 
             $result .= $template[$i];
             $i++;

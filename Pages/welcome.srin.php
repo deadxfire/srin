@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($title ?? 'Welcome to Srin Engine - Developed by Arindam Makar', ENT_QUOTES, 'UTF-8') ?></title>
-    <link rel="icon" type="image/svg+xml" href="{{assets('/favicon.svg')}}">
-    <link rel="alternate icon" href="{{assets('/favicon.ico')}}">
+    <link rel="icon" type="image/svg+xml" href="[[ asset('/favicon.svg') ]]">
+    <link rel="alternate icon" href="[[ asset('/favicon.ico') ]]">
     <style>
         :root {
             --primary: #2563eb;
@@ -181,38 +181,38 @@ assets/js/main.js
 assets/images/banner.jpg</code></pre>
                             </li>
                             <li>
-                                <strong>Connect the Route in <code>Routes/web.php</code>:</strong>
-                                <pre><code>Router::get('/', 'HomeController@index')->name('home');</code></pre>
+                                <strong>Connect the Route Link in <code>Routes/web.php</code>:</strong>
+                                <pre><code>getlink('/', 'HomeController@index')->name('home');</code></pre>
                             </li>
                         </ol>
                     </section>
 
                     <!-- 2. Assets Guide -->
                     <section id="assets-guide" class="doc-card">
-                        <h2>2. Connecting Assets Directly with <code>{{assets('/path')}}</code></h2>
+                        <h2>2. Connecting Assets Directly with <code>[[ asset('/path') ]]</code></h2>
                         <p>
-                            There are <strong>no default CSS or JS files</strong>. Whenever you connect CSS, JS, or public images, use the clean <code>{{assets('/path')}}</code> directive inside any <code>.srin.php</code> template. It resolves directly into the <code>assets/</code> folder:
+                            There are <strong>no default CSS or JS files</strong>. Whenever you connect CSS, JS, or public images, use the clean <code>[[ asset('/path') ]]</code> tag inside any <code>.srin.php</code> template. It resolves directly into the <code>assets/</code> folder:
                         </p>
 
                         <h3>Connecting CSS</h3>
-                        <pre><code>&lt;link rel="stylesheet" href="{{assets('/css/style.css')}}"&gt;</code></pre>
+                        <pre><code>&lt;link rel="stylesheet" href="[[ asset('/css/style.css') ]]"&gt;</code></pre>
 
                         <h3>Connecting JavaScript</h3>
-                        <pre><code>&lt;script src="{{assets('/js/main.js')}}"&gt;&lt;/script&gt;</code></pre>
+                        <pre><code>&lt;script src="[[ asset('/js/main.js') ]]"&gt;&lt;/script&gt;</code></pre>
 
                         <h3>Adding Public Images</h3>
-                        <p>Simply drop any image or folder inside <code>assets/images/</code> and link it directly — <code>{{assets('logo.png')}}</code> automatically maps image filenames to the images directory without needing the folder location path, generating the complete direct URL:</p>
-                        <pre><code>&lt;img src="{{assets('logo.png')}}" alt="Site Logo"&gt;
-&lt;img src="{{assets('/images/portfolio/project-1.jpg')}}" alt="Project"&gt;</code></pre>
+                        <p>Simply drop any image or folder inside <code>assets/images/</code> and link it directly — <code>[[ asset('logo.png') ]]</code> automatically maps image filenames to the images directory without needing the folder location path, generating the complete direct URL:</p>
+                        <pre><code>&lt;img src="[[ asset('logo.png') ]]" alt="Site Logo"&gt;
+&lt;img src="[[ asset('/images/portfolio/project-1.jpg') ]]" alt="Project"&gt;</code></pre>
 
                         <h3>Adding Custom Asset Folders</h3>
                         <p>You can add any folder into <code>assets/</code> (e.g. <code>assets/fonts/</code>, <code>assets/icons/</code>, <code>assets/videos/</code>). They link instantly:</p>
-                        <pre><code>&lt;link rel="preload" href="{{assets('/fonts/inter.woff2')}}" as="font"&gt;
-&lt;img src="{{assets('/icons/star.svg')}}" alt="Star"&gt;</code></pre>
+                        <pre><code>&lt;link rel="preload" href="[[ asset('/fonts/inter.woff2') ]]" as="font"&gt;
+&lt;img src="[[ asset('/icons/star.svg') ]]" alt="Star"&gt;</code></pre>
 
                         <div class="highlight-box">
                             <strong>Note on Subfolders &amp; Production Servers:</strong>
-                            <code>{{assets('/...')}}</code> automatically generates the full absolute URL (e.g. <code>https://mysite.com/assets/...</code>) and detects whether your site is on a root domain (<code>https://mysite.com</code>) or inside a server subfolder (<code>https://mysite.com/subfolder/</code>).
+                            <code>[[ asset('/...') ]]</code> automatically generates the full absolute URL (e.g. <code>https://mysite.com/assets/...</code>) and detects whether your site is on a root domain (<code>https://mysite.com</code>) or inside a server subfolder (<code>https://mysite.com/subfolder/</code>).
                         </div>
                     </section>
 
@@ -250,7 +250,7 @@ assets/images/banner.jpg</code></pre>
                             </div>
                             <div class="structure-item">
                                 <strong>Routes/</strong>
-                                <p>All URL routes are defined in <code>Routes/web.php</code> using clean <code>Router::get()</code> and <code>Router::post()</code> syntax.</p>
+                                <p>All URL routes are defined in <code>Routes/web.php</code> using clean <code>getlink()</code> and <code>postlink()</code> syntax (or <code>Link::get()</code>).</p>
                             </div>
                             <div class="structure-item">
                                 <strong>Others/</strong>
@@ -1311,7 +1311,7 @@ class ArticleController extends BaseController
                                     </tr>
 
                                     <tr style="background: rgba(2, 132, 199, 0.05); font-weight: 700;">
-                                        <td colspan="3">6. Template Helper Functions (Inside <code>@[[ ]]</code> or <code>@{{ }}</code>)</td>
+                                        <td colspan="3">6. Template Helper Functions (Inside <code>@[[ ]]</code> or <code>@[{ }]</code>)</td>
                                     </tr>
                                     <tr>
                                         <td><code>asset('/path')</code></td>
@@ -1370,19 +1370,22 @@ class ArticleController extends BaseController
 
                     <!-- 8. Defining Routes -->
                     <section id="routing" class="doc-card">
-                        <h2>8. Defining Routes &amp; Named Links (<code>Routes/web.php</code>)</h2>
-                        <p>Register all link paths in <code>Routes/web.php</code> and assign names using <code>->name('name')</code>:</p>
-                        <pre><code>use Core\Router;
+                        <h2>8. Defining Routes &amp; Route Links (<code>Routes/web.php</code>)</h2>
+                        <p>Register all link paths in <code>Routes/web.php</code> using Srin link functions or <code>Link::get()</code> and assign names using <code>-&gt;name('name')</code>:</p>
+                        <pre><code>use Core\Link;
 
-// Define named routes:
-Router::get('/', 'HomeController@index')->name('home');
-Router::get('/about', 'AboutController@index')->name('about');
-Router::get('/services', 'ServicesController@index')->name('services');
-Router::get('/contact', 'ContactController@index')->name('contact');
-Router::post('/contact', 'ContactController@sendMail')->name('contact.send');
+// Define named route links:
+getlink('/', 'HomeController@index')->name('home');
+getlink('/about', 'AboutController@index')->name('about');
+getlink('/services', 'ServicesController@index')->name('services');
+getlink('/contact', 'ContactController@index')->name('contact');
+postlink('/contact', 'ContactController@sendMail')->name('contact.send');
 
 // Route with dynamic parameters:
-Router::get('/portfolio/{slug}', 'PortfolioController@show')->name('portfolio.show');</code></pre>
+getlink('/portfolio/{slug}', 'PortfolioController@show')->name('portfolio.show');
+
+// Or fluent OOP Link syntax:
+Link::get('/pricing', 'PricingController@index')->name('pricing');</code></pre>
 
                         <h3>Linking to Named Routes in Templates:</h3>
                         <p>In any <code>.srin.php</code> template, generate links easily using <code>@[[ route('name') ]]</code>:</p>

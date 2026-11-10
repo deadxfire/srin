@@ -224,10 +224,10 @@ phpsystem/
 Srin Engine enforces strict access boundaries and defense-in-depth protections to defeat common and advanced web attack vectors:
 
 ### 1. XSS (Cross-Site Scripting) Defense on Output Expressions
-All dynamic expressions evaluated inside `[[ $expression ]]` or `{{ $expression }}` are automatically sanitized using `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Any injected HTML or `<script>` tags are neutralized before reaching the browser. Raw unescaped output is strictly quarantined to `[{ $trustedHtml }]`.
+All dynamic expressions evaluated inside `[[ $expression ]]` are automatically sanitized using `htmlspecialchars(..., ENT_QUOTES, 'UTF-8')`. Any injected HTML or `<script>` tags are neutralized before reaching the browser. Raw unescaped output is strictly quarantined to `[{ $trustedHtml }]`.
 
 ### 2. Bulletproof CSRF Protection for Forms
-Every form submission is protected using cryptographically random session tokens via `[csrf]` or `{{ csrf_field() }}`. Verified using timing-attack-safe `hash_equals()`; expired tokens automatically render a custom HTTP 419 error page with safe token regeneration.
+Every form submission is protected using cryptographically random session tokens via `[csrf]` (or `<?= csrf_field() ?>`). Verified using timing-attack-safe `hash_equals()`; expired tokens automatically render a custom HTTP 419 error page with safe token regeneration.
 
 ### 3. Invisible Anti-Bot Honeypot (`[honeypot]`)
 Block automated spam bots on contact and inquiry forms without slow, intrusive CAPTCHAs. Real users never see the invisible field; bots fill it and get rejected immediately.
@@ -908,30 +908,33 @@ Include reusable template chunks directly onto any webpage using clean dot-notat
 Assign names to your routes using `->name('name')`:
 
 ```php
-use Core\Router;
+use Core\Link;
 
 // Welcome Page
-Router::get('/', function() {
+getlink('/', function() {
     return view('welcome');
 })->name('home');
 
-// Controller Routes with Names
-Router::get('/portfolio', 'PortfolioController@index')->name('portfolio');
-Router::get('/contact', 'ContactController@index')->name('contact');
-Router::post('/contact', 'ContactController@sendMail')->name('contact.send');
+// Controller Route Links with Names
+getlink('/portfolio', 'PortfolioController@index')->name('portfolio');
+getlink('/contact', 'ContactController@index')->name('contact');
+postlink('/contact', 'ContactController@sendMail')->name('contact.send');
 
 // Route with dynamic parameters
-Router::get('/blog/{slug}', 'BlogController@show')->name('blog.show');
+getlink('/blog/{slug}', 'BlogController@show')->name('blog.show');
+
+// Fluent OOP Link facade:
+Link::get('/pricing', 'PricingController@index')->name('pricing');
 ```
 
 ### Linking with Route Names in Templates:
 ```html
-<a href="{{route('home')}}">Home</a>
-<a href="{{route('portfolio')}}">Portfolio</a>
-<a href="{{route('contact')}}">Contact Us</a>
+<a href="[[ route('home') ]]">Home</a>
+<a href="[[ route('portfolio') ]]">Portfolio</a>
+<a href="[[ route('contact') ]]">Contact Us</a>
 
 <!-- With Parameters -->
-<a href="{{route('blog.show', ['slug' => 'my-first-post'])}}">Read Article</a>
+<a href="[[ route('blog.show', ['slug' => 'my-first-post']) ]]">Read Article</a>
 ```
 
 ### In Controllers:
@@ -1098,20 +1101,20 @@ Srin Engine ships with three core checkpoints pre-registered in `Config/auth.php
 Attach checkpoints to individual routes or bundle them into groups:
 
 ```php
-use Core\Router;
+use Core\Link;
 
 // Single checkpoint
-Router::get('/dashboard', 'DashboardController@index', 'dashboard')
+getlink('/dashboard', 'DashboardController@index', 'dashboard')
     ->checkpoint('auth');
 
 // Multiple checkpoints in sequence
-Router::get('/admin/analytics', 'AdminController@analytics', 'admin.analytics')
+getlink('/admin/analytics', 'AdminController@analytics', 'admin.analytics')
     ->checkpoint(['auth', 'admin']);
 
 // Route Group with Checkpoint and Prefix
-Router::group(['prefix' => '/portal', 'checkpoint' => 'auth'], function () {
-    Router::get('/', 'PortalController@index', 'portal.home');
-    Router::get('/billing', 'PortalController@billing', 'portal.billing');
+grouplink(['prefix' => '/portal', 'checkpoint' => 'auth'], function () {
+    getlink('/', 'PortalController@index', 'portal.home');
+    getlink('/billing', 'PortalController@billing', 'portal.billing');
 });
 ```
 
@@ -1201,7 +1204,7 @@ Srin Engine provides native, safe file and image upload management right through
 
 ### 1. Upload Form Markup
 ```html
-<form action="{{ route('account.avatar') }}" method="POST" enctype="multipart/form-data">
+<form action="[[ route('account.avatar') ]]" method="POST" enctype="multipart/form-data">
     [csrf]
     [honeypot]
     <input type="file" name="avatar" accept="image/*" required>

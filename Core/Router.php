@@ -105,9 +105,9 @@ class Router
      * Create a route group sharing attributes like prefix, checkpoint, and name.
      *
      * Example:
-     *   Router::group(['prefix' => '/admin', 'checkpoint' => 'auth'], function() {
-     *       Router::get('/dashboard', 'AdminController@dashboard', 'admin.dashboard');
-     *       Router::get('/users', 'AdminController@users', 'admin.users');
+     *   grouplink(['prefix' => '/admin', 'checkpoint' => 'auth'], function() {
+     *       getlink('/dashboard', 'AdminController@dashboard', 'admin.dashboard');
+     *       getlink('/users', 'AdminController@users', 'admin.users');
      *   });
      */
     public static function group(array $attributes, Closure $callback): void
@@ -119,7 +119,7 @@ class Router
 
     /**
      * Register a GET route with optional direct route name.
-     * Example: Router::get('/articles', 'ArticleController@index', 'articles.index');
+     * Example: getlink('/articles', 'ArticleController@index', 'articles.index');
      */
     public static function get(string $path, mixed $handler, ?string $name = null): Route
     {
@@ -172,6 +172,30 @@ class Router
     public static function delete(string $path, mixed $handler, ?string $name = null): Route
     {
         $route = self::addRoute('DELETE', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
+    }
+
+    /**
+     * Register a PATCH route with optional direct route name.
+     */
+    public static function patch(string $path, mixed $handler, ?string $name = null): Route
+    {
+        $route = self::addRoute('PATCH', $path, $handler);
+        if ($name !== null) {
+            $route->name($name);
+        }
+        return $route;
+    }
+
+    /**
+     * Register an OPTIONS route with optional direct route name.
+     */
+    public static function options(string $path, mixed $handler, ?string $name = null): Route
+    {
+        $route = self::addRoute('OPTIONS', $path, $handler);
         if ($name !== null) {
             $route->name($name);
         }

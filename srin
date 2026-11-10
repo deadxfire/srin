@@ -261,12 +261,12 @@ PHP;
     echo color("\n[✓] Controller created successfully!", 'green') . "\n";
     echo "  Location: " . color("Controller/{$cleanName}.php", 'cyan') . "\n";
 
-    echo color("\nNext Step: Register route in Routes/web.php:\n", 'yellow');
+    echo color("\nNext Step: Register route link in Routes/web.php:\n", 'yellow');
     if ($hasMailFlag) {
-        echo color("  Router::get('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n", 'bold');
-        echo color("  Router::post('/{$baseName}', '{$cleanName}@sendMail')->name('{$baseName}.send');\n\n", 'bold');
+        echo color("  getlink('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n", 'bold');
+        echo color("  postlink('/{$baseName}', '{$cleanName}@sendMail')->name('{$baseName}.send');\n\n", 'bold');
     } else {
-        echo color("  Router::get('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n\n", 'bold');
+        echo color("  getlink('/{$baseName}', '{$cleanName}@index')->name('{$baseName}');\n\n", 'bold');
     }
 }
 
@@ -341,7 +341,7 @@ PHP;
 
     echo color("\n[+] Success: Checkpoint [{$cleanName}] created at Checkpoint/{$cleanName}.php\n", 'green');
     echo "Usage in routes:\n";
-    echo "  Router::get('/secure', 'SecureController@index')->checkpoint(\Checkpoint\\{$cleanName}::class);\n\n";
+    echo "  getlink('/secure', 'SecureController@index')->checkpoint(\Checkpoint\\{$cleanName}::class);\n\n";
 }
 
 /**
