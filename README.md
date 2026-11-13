@@ -312,8 +312,10 @@ Run `php srin` (or `php srin.php`) to generate controllers, checkpoints, models,
 
 ```bash
 # 1. Start development server
-php srin serve
-php srin serve --port=8080
+php srin serve                                  # Default (localhost:8000)
+php srin serve --port=8080                      # Custom port
+php srin serve --host=0.0.0.0 --port=8000       # Bind to all network interfaces (for VPS / LAN / server)
+php srin serve 0.0.0.0:8000                     # Shorthand host and port format
 
 # 2. Application Logging (Terminal Log Viewer)
 php srin logs                        # View latest application log entries

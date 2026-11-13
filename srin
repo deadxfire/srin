@@ -1068,19 +1068,51 @@ function handleClearLogs(string $baseDir): void
  */
 function handleServe(array $args): void
 {
+    $host = 'localhost';
     $port = 8000;
-    foreach ($args as $arg) {
+
+    for ($i = 0; $i < count($args); $i++) {
+        $arg = $args[$i];
+
         if (str_starts_with($arg, '--port=')) {
             $port = (int) substr($arg, 7);
+        } elseif ($arg === '--port' && isset($args[$i + 1])) {
+            $port = (int) $args[++$i];
+        } elseif (str_starts_with($arg, '--host=')) {
+            $host = trim(substr($arg, 7));
+        } elseif ($arg === '--host' && isset($args[$i + 1])) {
+            $host = trim($args[++$i]);
+        } elseif (str_starts_with($arg, '-p=')) {
+            $port = (int) substr($arg, 3);
+        } elseif ($arg === '-p' && isset($args[$i + 1])) {
+            $port = (int) $args[++$i];
+        } elseif (str_starts_with($arg, '-h=') && !in_array($arg, ['-h', '--help'])) {
+            $host = trim(substr($arg, 3));
+        } elseif (preg_match('/^([a-zA-Z0-9\.\_\-]+):(\d+)$/', $arg, $m)) {
+            $host = $m[1];
+            $port = (int) $m[2];
+        } elseif (is_numeric($arg) && !in_array($arg, ['run', 'serve', 'dev', 'up'])) {
+            $port = (int) $arg;
         }
     }
 
-    echo color("\nStarting Srin Engine local server...\n", 'green');
-    echo "URL: " . color("http://localhost:{$port}\n", 'cyan');
+    if ($port <= 0 || $port > 65535) {
+        $port = 8000;
+    }
+    $host = preg_replace('/[^a-zA-Z0-9\.\_\-]/', '', $host) ?: 'localhost';
+
+    echo color("\nStarting Srin Engine server...\n", 'green');
+    $displayHost = in_array($host, ['0.0.0.0', '::', '[::]']) ? 'localhost' : $host;
+    echo "Host:         " . color("{$host}\n", 'cyan');
+    echo "Port:         " . color("{$port}\n", 'cyan');
+    echo "Local URL:    " . color("http://{$displayHost}:{$port}\n", 'cyan');
+    if ($host === '0.0.0.0') {
+        echo "Network URL:  " . color("http://<your-server-ip>:{$port}\n", 'cyan');
+    }
     echo "Default page: " . color("Pages/welcome.srin.php\n", 'yellow');
     echo "Press Ctrl+C to stop.\n\n";
 
-    passthru("php -S localhost:{$port} index.php");
+    passthru("php -S {$host}:{$port} index.php");
 }
 
 /**
@@ -2324,7 +2356,7 @@ function showHelp(): void
     echo "  " . color("init [--force]", 'green') . "                    Initialize project (.env, project name, APP_KEY)\n";
     echo "  " . color("commands", 'green') . "                          List all custom CLI and cPanel cron commands\n";
     echo "  " . color("links", 'green') . "                            List all registered route links from Routes/link.php\n";
-    echo "  " . color("dev [--port=8000]", 'green') . "                Start local PHP development server\n";
+    echo "  " . color("serve [--host=0.0.0.0] [--port=8000]", 'green') . " Start PHP development server (aliases: dev, up)\n";
     echo "  " . color("key [--force]", 'green') . "                    Generate application 256-bit encryption key (APP_KEY)\n";
     echo "  " . color("logs [-f] [--lines=N] [--mail]", 'green') . "   View application logs in terminal (live tail with -f)\n";
     echo "  " . color("clear logs", 'green') . "                       Clear application and mail logs\n";
