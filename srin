@@ -2107,13 +2107,48 @@ function handleUpgrade(array $args, string $baseDir): void
 }
 
 /**
- * Perform an HTTP GET request with cURL or stream context fallback.
+ * Automatically discover system CA bundle path across Windows, macOS, and Linux.
+ */
+function srinFindCaBundle(): ?string
+{
+    $candidates = [
+        ini_get('curl.cainfo'),
+        ini_get('openssl.cafile'),
+        'C:\\Program Files\\Git\\mingw64\\etc\\ssl\\certs\\ca-bundle.crt',
+        'C:\\Program Files\\Git\\usr\\ssl\\certs\\ca-bundle.crt',
+        'C:\\Program Files (x86)\\Git\\mingw64\\etc\\ssl\\certs\\ca-bundle.crt',
+        'C:\\Program Files (x86)\\Git\\usr\\ssl\\certs\\ca-bundle.crt',
+        getenv('LOCALAPPDATA') ? getenv('LOCALAPPDATA') . '\\Programs\\Git\\mingw64\\etc\\ssl\\certs\\ca-bundle.crt' : null,
+        getenv('APPDATA') ? getenv('APPDATA') . '\\Composer\\cacert.pem' : null,
+        dirname(PHP_BINARY) . '\\extras\\ssl\\cacert.pem',
+        dirname(PHP_BINARY) . '\\cacert.pem',
+        '/etc/ssl/certs/ca-certificates.crt',
+        '/etc/pki/tls/certs/ca-bundle.crt',
+        '/etc/ssl/ca-bundle.pem',
+        '/etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem',
+        '/etc/ssl/cert.pem',
+        '/usr/local/share/certs/ca-root-nss.crt',
+    ];
+
+    foreach ($candidates as $path) {
+        if ($path && is_string($path) && file_exists($path) && is_readable($path)) {
+            return $path;
+        }
+    }
+
+    return null;
+}
+
+/**
+ * Perform an HTTP GET request with cURL, system curl, or stream context fallback.
  */
 function srinHttpGet(string $url): ?string
 {
     if (!str_starts_with(strtolower($url), 'https://')) {
         return null;
     }
+
+    $caBundle = srinFindCaBundle();
 
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
@@ -2122,6 +2157,9 @@ function srinHttpGet(string $url): ?string
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        if ($caBundle) {
+            curl_setopt($ch, CURLOPT_CAINFO, $caBundle);
+        }
         if (defined('CURLOPT_REDIR_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
             curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
         }
@@ -2136,6 +2174,23 @@ function srinHttpGet(string $url): ?string
         }
     }
 
+    // Fallback 1: System curl (uses native OS certificate store e.g. Windows Schannel)
+    $escapedUrl = escapeshellarg($url);
+    $sysCurl = @shell_exec("curl -fsSL -A \"Srin-Engine-Updater/1.0\" {$escapedUrl} 2>&1");
+    if ($sysCurl !== null && strlen(trim($sysCurl)) > 0 && !str_starts_with($sysCurl, 'curl:')) {
+        return $sysCurl;
+    }
+
+    // Fallback 2: Stream context
+    $sslOpts = [
+        'verify_peer' => true,
+        'verify_peer_name' => true,
+        'allow_self_signed' => false,
+    ];
+    if ($caBundle) {
+        $sslOpts['cafile'] = $caBundle;
+    }
+
     $ctx = stream_context_create([
         'http' => [
             'method' => 'GET',
@@ -2144,11 +2199,7 @@ function srinHttpGet(string $url): ?string
             'follow_location' => 1,
             'max_redirects' => 5,
         ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-            'allow_self_signed' => false,
-        ],
+        'ssl' => $sslOpts,
     ]);
 
     $data = @file_get_contents($url, false, $ctx);
@@ -2156,13 +2207,15 @@ function srinHttpGet(string $url): ?string
 }
 
 /**
- * Stream-download a remote file to destination.
+ * Stream-download a remote file to destination with multi-layer fallback.
  */
 function srinDownloadFile(string $url, string $destination): bool
 {
     if (!str_starts_with(strtolower($url), 'https://')) {
         return false;
     }
+
+    $caBundle = srinFindCaBundle();
 
     $fp = @fopen($destination, 'w+');
     if (!$fp) {
@@ -2176,6 +2229,9 @@ function srinDownloadFile(string $url, string $destination): bool
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 2);
+        if ($caBundle) {
+            curl_setopt($ch, CURLOPT_CAINFO, $caBundle);
+        }
         if (defined('CURLOPT_REDIR_PROTOCOLS') && defined('CURLPROTO_HTTPS')) {
             curl_setopt($ch, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
         }
@@ -2186,7 +2242,35 @@ function srinDownloadFile(string $url, string $destination): bool
         $success = curl_exec($ch);
         $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         fclose($fp);
-        return $success && ($code >= 200 && $code < 400);
+        if ($success && ($code >= 200 && $code < 400) && file_exists($destination) && filesize($destination) > 0) {
+            return true;
+        }
+    } else {
+        fclose($fp);
+    }
+
+    // Fallback 1: System curl command
+    @unlink($destination);
+    $escapedUrl = escapeshellarg($url);
+    $escapedDest = escapeshellarg($destination);
+    @exec("curl -fsSL -A \"Srin-Engine-Updater/1.0\" {$escapedUrl} -o {$escapedDest} 2>&1", $output, $code);
+    if ($code === 0 && file_exists($destination) && filesize($destination) > 0) {
+        return true;
+    }
+
+    // Fallback 2: Stream context
+    $fp = @fopen($destination, 'w+');
+    if (!$fp) {
+        return false;
+    }
+
+    $sslOpts = [
+        'verify_peer' => true,
+        'verify_peer_name' => true,
+        'allow_self_signed' => false,
+    ];
+    if ($caBundle) {
+        $sslOpts['cafile'] = $caBundle;
     }
 
     $ctx = stream_context_create([
@@ -2197,15 +2281,11 @@ function srinDownloadFile(string $url, string $destination): bool
             'follow_location' => 1,
             'max_redirects' => 5,
         ],
-        'ssl' => [
-            'verify_peer' => true,
-            'verify_peer_name' => true,
-            'allow_self_signed' => false,
-        ],
+        'ssl' => $sslOpts,
     ]);
 
     $data = @file_get_contents($url, false, $ctx);
-    if ($data !== false) {
+    if ($data !== false && strlen($data) > 0) {
         fwrite($fp, $data);
         fclose($fp);
         return true;
